@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>看板娘控制台 - 设置中心</title>
+    <script src="assets/jquery.min.js?v=3.3.1"></script>
+    <!-- 复用部分原有样式 -->
+    <link rel="stylesheet" type="text/css" href="assets/waifu.css?v=1.4.2"/>
+    
+    <style>
+        /* --- 基础重置与布局优化 --- */
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: #f5f7fa;
+            font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #444;
+        }
+
+        .waifu-settings-wrapper {
+            width: 100%;
+            max-width: 850px;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 85vh;
+            border: 1px solid #ebeef5;
+        }
+
+        /* --- 头部与导航 --- */
+        .settings-header {
+            padding: 18px 24px;
+            background: #fff;
+            border-bottom: 1px solid #ebeef5;
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+        }
+        .settings-close { display: none; }
+
+        .settings-tabs {
+            padding: 0 24px;
+            background: #fcfcfc;
+            border-bottom: 1px solid #ebeef5;
+            display: flex;
+            gap: 20px;
+        }
+        .settings-tab-item {
+            padding: 16px 0;
+            font-size: 14px;
+            color: #606266;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        .settings-tab-item:hover { color: #409eff; }
+        .settings-tab-item.active {
+            color: #409eff;
+            border-bottom-color: #409eff;
+        }
+
+        /* --- 内容区域 --- */
+        .settings-content {
+            padding: 24px 30px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .setting-section-title {
+            font-size: 13px;
+            color: #909399;
+            margin: 20px 0 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-left: 3px solid #409eff;
+            padding-left: 8px;
+            line-height: 1;
+        }
+        .setting-section-title:first-child { margin-top: 0; }
+
+        /* --- 表单控件通用样式 --- */
+        .setting-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 4px 0;
+        }
+
+        /* 标签样式优化：支持内部包含按钮 */
+        .setting-group label.setting-label {
+            width: 220px;
+            flex-shrink: 0;
+            margin-bottom: 0;
+            font-size: 14px;
+            color: #606266;
+            display: flex;
+            align-items: center;
+            /* 如果标签内有按钮，让它们两端对齐或保持间距 */
+            gap: 8px; 
+            padding-right: 15px;
+        }
+
+        /* 输入框与下拉框统一 */
+        .waifu-select, 
+        .waifu-textarea, 
+        input[type="text"], 
+        input[type="password"], 
+        input[type="number"] {
+            flex: 1;
+            max-width: 450px;
+            height: 36px;
+            line-height: 36px; /* 确保垂直居中 */
+            padding: 0 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            background-color: #fff;
+            box-shadow: none;
+            outline: none;
+        }
+
+        .waifu-select:focus,
+        input:focus,
+        .waifu-textarea:focus {
+            border-color: #409eff;
+        }
+        
+        /* 针对 textarea 特殊处理 */
+        .waifu-textarea {
+            height: auto;
+            line-height: 1.5;
+            padding: 8px 12px;
+            font-family: inherit;
+        }
+
+        /* --- 按钮样式优化 (用于 Label 内部的刷新按钮等) --- */
+        .waifu-btn.secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 24px;
+            padding: 0 8px;
+            font-size: 12px;
+            border-radius: 3px;
+            border: 1px solid #dcdfe6;
+            background: #fff;
+            color: #606266;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            line-height: 1;
+        }
+        .waifu-btn.secondary:hover {
+            color: #409eff;
+            border-color: #c6e2ff;
+            background-color: #ecf5ff;
+        }
+        /* 强制覆盖原来的 float:right，改用 Flex */
+        .setting-label button {
+            float: none !important;
+            margin-left: auto; /* 自动推到右边，前提是父元素是 flex */
+        }
+
+        /* --- Checkbox 组优化 --- */
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* 响应式网格 */
+            gap: 10px;
+            background: #fcfcfc;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #ebeef5;
+            margin-bottom: 20px;
+        }
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            width: auto !important;
+            margin: 0;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        .checkbox-group hr {
+            grid-column: 1 / -1; /* 分割线占满整行 */
+            border-top-color: #e4e7ed;
+            margin: 5px 0;
+        }
+
+        /* --- Prompt 区域特殊处理 --- */
+        .prompt-group {
+            display: block;
+            margin-bottom: 20px;
+        }
+        /* 重写 Prompt 的 Label，使其成为 Flex 容器以对齐右侧按钮 */
+        .prompt-group .setting-label {
+            width: 100% !important;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .prompt-group textarea {
+            width: 100%;
+            max-width: 100%;
+            height: 100px;
+            resize: vertical;
+        }
+
+        /* --- 底部提示 --- */
+        .footer-tip {
+            text-align: center;
+            padding: 12px;
+            background: #fdfdfd;
+            color: #909399;
+            font-size: 12px;
+            border-top: 1px solid #ebeef5;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="waifu-settings-wrapper">
+        <div class="settings-header">
+            <span>🔧 看板娘设置中心</span>
+        </div>
+        
+        <!-- 顶部 Tab 导航 -->
+        <div class="settings-tabs">
+            <div class="settings-tab-item active" data-tab="general">常规设置</div>
+            <div class="settings-tab-item" data-tab="style">外观样式</div>
+            <div class="settings-tab-item" data-tab="toolbar">工具栏</div>
+            <div class="settings-tab-item" data-tab="llm">LLM & AI</div>
+        </div>
+
+        <div class="settings-content">
+            
+            <!-- Tab 1: 常规设置 -->
+            <div id="tab-general" class="tab-pane active">
+                <div class="setting-section-title">后端与API</div>
+                <div class="setting-group">
+                    <label class="setting-label">一言 API 源</label>
+                    <select data-key="hitokotoAPI" class="waifu-select config-item">
+                        <option value="hitokoto.cn">hitokoto.cn (默认)</option>
+                        <option value="lwl12.com">lwl12.com</option>
+                        <option value="jinrishici.com">jinrishici.com (古诗词)</option>
+                        <option value="fghrsh.net">fghrsh.net</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">Tips JSON 路径</label>
+                    <input data-key="tipsMessage" class="waifu-select config-item" type="text">
+                </div>
+
+                <div class="setting-section-title">交互与提示消息</div>
+                <!-- Checkbox 组 -->
+                <div class="checkbox-group">
+                    <label><input data-key="showHitokoto" class="config-item" type="checkbox"> 显示一言 (空闲时)</label>
+                    <label><input data-key="showWelcomeMessage" class="config-item" type="checkbox"> 显示欢迎词</label>
+                    <label><input data-key="showCopyMessage" class="config-item" type="checkbox"> 显示复制提示</label>
+                    <label><input data-key="showF12Status" class="config-item" type="checkbox"> F12 显示加载状态</label>
+                    <label><input data-key="showF12Message" class="config-item" type="checkbox"> F12 显示看板娘消息</label>
+                    <label><input data-key="showF12OpenMsg" class="config-item" type="checkbox"> F12 显示打开提示</label>
+                </div>
+
+                <div class="setting-section-title">模型切换偏好</div>
+                <div class="checkbox-group">
+                    <label><input data-key="modelStorage" class="config-item" type="checkbox"> 记录模型ID (刷新恢复)</label>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">模型切换模式</label>
+                    <select data-key="modelRandMode" class="waifu-select config-item">
+                        <option value="switch">顺序切换</option>
+                        <option value="rand">随机切换</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">材质切换模式</label>
+                    <select data-key="modelTexturesRandMode" class="waifu-select config-item">
+                        <option value="rand">随机切换</option>
+                        <option value="switch">顺序切换</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Tab 2: 样式设置 -->
+            <div id="tab-style" class="tab-pane">
+                <div class="setting-section-title">尺寸与位置</div>
+                <div class="setting-group">
+                    <label class="setting-label">看板娘大小 (宽x高)</label>
+                    <input data-key="waifuSize" class="waifu-select config-item" type="text" placeholder="280x250">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">提示框大小 (宽x高)</label>
+                    <input data-key="waifuTipsSize" class="waifu-select config-item" type="text" placeholder="250x75">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">字体大小</label>
+                    <input data-key="waifuFontSize" class="waifu-select config-item" type="text" placeholder="12px">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">贴边设置 (left:0 / right:30)</label>
+                    <input data-key="waifuEdgeSide" class="waifu-select config-item" type="text">
+                </div>
+                
+                <div class="setting-section-title">交互行为</div>
+                <div class="setting-group">
+                    <label class="setting-label">拖拽设置</label>
+                    <select data-key="waifuDraggable" class="waifu-select config-item">
+                        <option value="disable">禁用拖拽</option>
+                        <option value="axis-x">水平拖拽</option>
+                        <option value="unlimited">自由拖拽</option>
+                    </select>
+                </div>
+                <div class="checkbox-group">
+                    <label><input data-key="waifuDraggableRevert" class="config-item" type="checkbox"> 松开鼠标还原位置</label>
+                </div>
+
+                <div class="setting-section-title">工具栏微调</div>
+                <div class="setting-group">
+                    <label class="setting-label">工具栏字体大小</label>
+                    <input data-key="waifuToolFont" class="waifu-select config-item" type="text" placeholder="14px">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">工具栏行高</label>
+                    <input data-key="waifuToolLine" class="waifu-select config-item" type="text" placeholder="20px">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">工具栏顶部偏移</label>
+                    <input data-key="waifuToolTop" class="waifu-select config-item" type="text" placeholder="-20px">
+                </div>
+            </div>
+
+            <!-- Tab 3: 工具栏设置 -->
+            <div id="tab-toolbar" class="tab-pane">
+                <div class="setting-section-title">按钮显示开关</div>
+                <div class="checkbox-group">
+                    <label><input data-key="showToolMenu" class="config-item" type="checkbox"> <b>显示整个工具栏</b></label>
+                    <hr>
+                    <label><input data-key="canTurnToHomePage" class="config-item" type="checkbox"> 返回首页 (房子)</label>
+                    <label><input data-key="canSwitchHitokoto" class="config-item" type="checkbox"> 一言切换 (气泡)</label>
+                    <label><input data-key="canSwitchModel" class="config-item" type="checkbox"> 模型切换 (眼睛)</label>
+                    <label><input data-key="canSwitchTextures" class="config-item" type="checkbox"> 材质切换 (衣服)</label>
+                    <label><input data-key="canTakeScreenshot" class="config-item" type="checkbox"> 看板娘截图 (相机)</label>
+                    <label><input data-key="canTurnToAboutPage" class="config-item" type="checkbox"> 关于页 (信息)</label>
+                    <label><input data-key="canCloseLive2d" class="config-item" type="checkbox"> 关闭看板娘 (叉号)</label>
+                    <hr>
+                    <label style="color:#409eff; font-weight:bold;"><input data-key="showLLM" class="config-item" type="checkbox"> LLM 对话 (星星)</label>
+                    <label style="color:#409eff; font-weight:bold;"><input data-key="showPeek" class="config-item" type="checkbox"> Peek 屏幕观察 (录像机)</label>
+                    <label style="color:#409eff; font-weight:bold;"><input data-key="showSettings" class="config-item" type="checkbox"> 设置面板 (齿轮)</label>
+                </div>
+            </div>
+
+            <!-- Tab 4: LLM 设置 -->
+            <div id="tab-llm" class="tab-pane">
+                <div class="setting-section-title">核心接口配置</div>
+                <div class="setting-group">
+                    <label class="setting-label">LLM API 地址</label>
+                    <input data-key="llmApiUrl" class="waifu-select config-item llm-item" type="text" placeholder="http://127.0.0.1:11434/v1/chat/completions">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">API Key</label>
+                    <input data-key="llmApiKey" class="waifu-select config-item llm-item" type="password" placeholder="Ollama可留空">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">Python 后端地址</label>
+                    <input data-key="pythonServerUrl" class="waifu-select config-item llm-item" type="text" placeholder="http://127.0.0.1:11542/">
+                </div>
+
+                <div class="setting-section-title">模型选择</div>
+                <div class="setting-group">
+                    <!-- 优化：Label 包含按钮，通过 Flexbox 对齐 -->
+                    <label class="setting-label">
+                        普通模型 
+                        <button id="btn-refresh-models" class="waifu-btn secondary">刷新列表</button>
+                    </label>
+                    <select id="model-normal" class="waifu-select llm-item">
+                        <option value="">点击按钮刷新...</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">思考模型</label>
+                    <select id="model-thinking" class="waifu-select llm-item">
+                        <option value="">点击按钮刷新...</option>
+                    </select>
+                </div>
+
+                <div class="setting-section-title">功能开关</div>
+                <div class="checkbox-group">
+                    <label><input id="use-thinking-waifu" class="llm-item" type="checkbox"> 看板娘对话使用思考模型</label>
+                    <label><input id="use-thinking-chat" class="llm-item" type="checkbox"> 聊天助手使用思考模型</label>
+                    <label><input id="use-thinking-roast" class="llm-item" type="checkbox"> 屏幕吐槽使用思考模型</label>
+                </div>
+                
+                <div class="setting-section-title">定时设置</div>
+                <div class="setting-group">
+                    <label class="setting-label">自动吐槽间隔 (ms)</label>
+                    <input data-key="roastInterval" class="waifu-select config-item llm-item" type="number" placeholder="60000">
+                </div>
+                <div class="checkbox-group">
+                    <label><input data-key="autoRoast" class="config-item llm-item" type="checkbox"> 开启自动定时吐槽</label>
+                </div>
+
+                <div class="setting-section-title">Peek (屏幕观察) 参数</div>
+                <div class="setting-group">
+                    <label class="setting-label">功能模式</label>
+                    <select id="peek-mode" class="waifu-select llm-item">
+                        <option value="roast">屏幕吐槽 (Roast)</option>
+                        <option value="chat">聊天助手 (Chat Helper)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">截图范围</label>
+                    <select id="peek-target-type" class="waifu-select llm-item">
+                        <option value="fullscreen">全屏截图</option>
+                        <option value="window">指定窗口</option>
+                    </select>
+                </div>
+                <div class="setting-group" id="group-window-select" style="display:none;">
+                    <label class="setting-label">
+                        目标窗口
+                        <button id="btn-refresh-windows" class="waifu-btn secondary">刷新</button>
+                    </label>
+                    <select id="peek-window-list" class="waifu-select llm-item">
+                        <option value="0">请点击刷新...</option>
+                    </select>
+                </div>
+
+                <!-- 提示词输入框优化：Flex 布局标题栏 -->
+                <div class="prompt-group" id="group-prompt-roast">
+                    <label class="setting-label">
+                        <span>吐槽提示词</span>
+                        <button id="btn-reset-roast" class="waifu-btn secondary">重置默认</button>
+                    </label>
+                    <textarea id="prompt-roast" class="waifu-textarea llm-item"></textarea>
+                </div>
+                <div class="prompt-group" id="group-prompt-chat" style="display:none;">
+                    <label class="setting-label">
+                        <span>助手提示词</span>
+                        <button id="btn-reset-chat" class="waifu-btn secondary">重置默认</button>
+                    </label>
+                    <textarea id="prompt-chat" class="waifu-textarea llm-item"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-tip">
+            设置已自动保存。刷新主页面或重新打开看板娘即可生效。
+        </div>
+    </div>
+
+    <!-- 逻辑代码保持完全原样，未做任何修改 -->
+    <script>
+        $(document).ready(function() {
+            
+            // --- 1. Tab 切换逻辑 ---
+            $('.settings-tab-item').click(function() {
+                $('.settings-tab-item').removeClass('active');
+                $(this).addClass('active');
+                $('.tab-pane').hide();
+                $('#tab-' + $(this).data('tab')).show();
+            });
+
+            // --- 2. 定义默认配置 (与 live2d.js 保持一致，防止读取空值报错) ---
+            var defaultGlobal = {
+                'waifuSize': '280x250',
+                'waifuTipsSize': '250x75',
+                'waifuFontSize': '12px',
+                'waifuToolFont': '14px',
+                'waifuToolLine': '20px',
+                'waifuToolTop': '-20px',
+                'waifuDraggable': 'disable',
+                'waifuDraggableRevert': true,
+                'hitokotoAPI': 'hitokoto.cn',
+                'showHitokoto': true,
+                'showToolMenu': true,
+                'modelRandMode': 'switch',
+                'modelTexturesRandMode': 'rand',
+                'showLLM': true,
+                'showPeek': true,
+                'showSettings': true,
+                // ... 其他默认值可按需补充
+            };
+
+            var defaultLLM = {
+                'llmApiUrl': 'http://127.0.0.1:11434/v1/chat/completions',
+                'pythonServerUrl': 'http://127.0.0.1:11542/',
+                'roastInterval': 60000,
+                'peekMode': 'roast',
+                'targetType': 'fullscreen',
+                roastPrompt: `你是一个住在用户电脑桌面上的可爱看板娘。这是用户当前的屏幕截图。\n
+用户当前正在操作的窗口是：'/window_title'。\n
+背景里挂着的窗口还有：/window_list。\n\n
+请根据屏幕内容和窗口判断用户正在做什么，并以**女朋友或贴心助手**的口吻直接对用户说话（使用第二人称‘你’）。\n
+要求：\n
+1. 不要描述画面内容，直接开启话题。\n
+2. 这是一个猜测互动的过程。\n
+3. 语气要软萌、可爱、充满元气。\n
+4. 字数控制在50字以内。`,
+                chatPrompt: `你是一个智能聊天助手。当前窗口是 '/window_title'。\n
+请阅读图片中的聊天记录或文本内容，结合上下文，生成一个合适的、高情商的回复。\n
+请直接给出你此刻会发送的那一句话，你的回复应像真人在即时聊天中自然打出的内容，不要包含解释。`
+            };
+
+            // --- 3. 读取并填充设置 ---
+            function loadSettings() {
+                // 读取 Global
+                var savedGlobal = localStorage.getItem('waifu_global_settings');
+                var configGlobal = $.extend({}, defaultGlobal, savedGlobal ? JSON.parse(savedGlobal) : {});
+
+                // 读取 LLM
+                var savedLLM = localStorage.getItem('waifu_llm_settings');
+                var configLLM = $.extend({}, defaultLLM, savedLLM ? JSON.parse(savedLLM) : {});
+
+                // 填充 .config-item (主要对应 Global)
+                $('.config-item').each(function() {
+                    var key = $(this).data('key');
+                    // 优先从 LLM 中找 (例如 API URL)，如果没有再从 Global 找
+                    var val = configLLM[key] !== undefined ? configLLM[key] : configGlobal[key];
+                    
+                    if (val !== undefined) {
+                        if ($(this).attr('type') === 'checkbox') {
+                            $(this).prop('checked', val);
+                        } else {
+                            $(this).val(val);
+                        }
+                    }
+                });
+
+                // 填充 LLM 专用控件 (ID 绑定的那些)
+                $('#model-normal').val(configLLM.modelNormal);
+                $('#model-thinking').val(configLLM.modelThinking);
+                $('#use-thinking-waifu').prop('checked', configLLM.useThinkingWaifu);
+                $('#use-thinking-chat').prop('checked', configLLM.useThinkingChat);
+                $('#use-thinking-roast').prop('checked', configLLM.useThinkingRoast);
+                $('#peek-mode').val(configLLM.peekMode || 'roast');
+                $('#peek-target-type').val(configLLM.targetType || 'fullscreen');
+                $('#prompt-roast').val(configLLM.roastPrompt);
+                $('#prompt-chat').val(configLLM.chatPrompt);
+
+                toggleLLMUI(); // 刷新 UI 显示状态
+            }
+
+            // --- 4. 保存逻辑 ---
+            function saveSettings() {
+                // 保存 Global
+                var currentGlobal = localStorage.getItem('waifu_global_settings') ? JSON.parse(localStorage.getItem('waifu_global_settings')) : {};
+                
+                $('.config-item').each(function() {
+                    var key = $(this).data('key');
+                    // 排除掉属于 LLM 的 key (虽然这里混用了 config-item class)
+                    // 简单判断：如果它没有 llm-item 这个类，就存入 Global
+                    if (!$(this).hasClass('llm-item')) {
+                        if ($(this).attr('type') === 'checkbox') currentGlobal[key] = $(this).is(':checked');
+                        else currentGlobal[key] = $(this).val();
+                    }
+                });
+                localStorage.setItem('waifu_global_settings', JSON.stringify(currentGlobal));
+
+                // 保存 LLM
+                var currentLLM = localStorage.getItem('waifu_llm_settings') ? JSON.parse(localStorage.getItem('waifu_llm_settings')) : {};
+                
+                // 收集 llm-item 类的 config-item
+                $('.llm-item.config-item').each(function() {
+                    var key = $(this).data('key');
+                    if ($(this).attr('type') === 'checkbox') currentLLM[key] = $(this).is(':checked');
+                    else currentLLM[key] = $(this).val();
+                });
+
+                // 收集 ID 绑定的 LLM 设置
+                currentLLM.modelNormal = $('#model-normal').val();
+                currentLLM.modelThinking = $('#model-thinking').val();
+                currentLLM.useThinkingWaifu = $('#use-thinking-waifu').is(':checked');
+                currentLLM.useThinkingChat = $('#use-thinking-chat').is(':checked');
+                currentLLM.useThinkingRoast = $('#use-thinking-roast').is(':checked');
+                currentLLM.peekMode = $('#peek-mode').val();
+                currentLLM.targetType = $('#peek-target-type').val();
+                currentLLM.targetHwid = $('#peek-window-list').val();
+                currentLLM.roastPrompt = $('#prompt-roast').val();
+                currentLLM.chatPrompt = $('#prompt-chat').val();
+                
+                localStorage.setItem('waifu_llm_settings', JSON.stringify(currentLLM));
+            }
+
+            // 监听所有输入变化，自动保存
+            $('input, select, textarea').change(function() {
+                toggleLLMUI();
+                saveSettings();
+            });
+
+            // --- 5. UI 辅助逻辑 ---
+            function toggleLLMUI() {
+                var mode = $('#peek-mode').val();
+                var target = $('#peek-target-type').val();
+                
+                $('.prompt-group').hide();
+                $('#group-prompt-' + mode).show();
+
+                if (target === 'window') $('#group-window-select').show();
+                else $('#group-window-select').hide();
+            }
+
+            // --- 6. 远程数据获取 (模型列表与窗口列表) ---
+            // 这里的 fetchUrl 需要从 input 中动态获取，防止用户改了 input 还没保存
+            function getPythonUrl() {
+                var url = $('input[data-key="pythonServerUrl"]').val();
+                if (!url) return ''; // 防止空地址报错
+                return url.endsWith('/') ? url : url + '/';
+            }
+
+            async function fetchModelList() {
+                var $btn = $('#btn-refresh-models');
+                var $selects = $('#model-normal, #model-thinking');
+                
+                // 1. 界面显示“加载中”
+                $btn.text('刷新中...');
+                // 这里的 html() 只是临时占位，防止用户看起来以为坏了
+                // $selects.html('<option>加载中...</option>'); 
+
+                try {
+                    var apiUrl = getPythonUrl();
+                    if (!apiUrl) throw new Error("API地址为空");
+
+                    // 2. 请求后端
+                    const response = await fetch(apiUrl + 'list_models');
+                    const data = await response.json();
+                    
+                    // 3. 生成 HTML 选项
+                    var html = '';
+                    if (data.models && data.models.length > 0) {
+                        data.models.forEach(m => html += `<option value="${m}">${m}</option>`);
+                    } else {
+                        html = '<option value="">未找到模型</option>';
+                    }
+                    
+                    // 4. 填充下拉框
+                    $selects.html(html);
+
+                    // 5. 【关键】列表有了之后，重新从 LocalStorage 恢复选中的值
+                    var savedLLM = JSON.parse(localStorage.getItem('waifu_llm_settings') || '{}');
+                    if (savedLLM.modelNormal) $('#model-normal').val(savedLLM.modelNormal);
+                    if (savedLLM.modelThinking) $('#model-thinking').val(savedLLM.modelThinking);
+                    
+                } catch (e) {
+                    console.error(e);
+                    // 如果自动加载失败（比如后端没开），给个友好的提示，保留原来的选项
+                    $selects.html('<option value="">连接失败，请检查后端</option>');
+                } finally {
+                    $btn.text('刷新列表');
+                }
+            }
+
+            $('#btn-refresh-models').click(function() {
+                fetchModelList();
+            });
+
+            $('#btn-refresh-windows').click(async function() {
+                var $btn = $(this);
+                $btn.text('...');
+                try {
+                    const response = await fetch(getPythonUrl() + 'list_windows');
+                    const data = await response.json();
+                    var html = '';
+                    if (data.windows) {
+                        data.windows.forEach(w => html += `<option value="${w.id}">${w.title}</option>`);
+                    }
+                    $('#peek-window-list').html(html);
+                    
+                    // 恢复选中的窗口（如果有）
+                    var savedLLM = JSON.parse(localStorage.getItem('waifu_llm_settings') || '{}');
+                    if(savedLLM.targetHwid) $('#peek-window-list').val(savedLLM.targetHwid);
+                    
+                } catch (e) {
+                    alert('获取窗口失败'); // 自动加载时最好别弹窗
+                }
+                $btn.text('刷新');
+            });
+            
+            // 重置提示词按钮
+            $('#btn-reset-roast').click(function(){ 
+                $('#prompt-roast').val(defaultLLM.roastPrompt); saveSettings(); 
+            });
+            $('#btn-reset-chat').click(function(){ 
+                $('#prompt-chat').val(defaultLLM.chatPrompt); saveSettings(); 
+            });
+
+            // --- 7. 初始化执行 ---
+            
+            // 先加载基础文本框设置 (URL, API Key 等)
+            loadSettings(); 
+            
+            // 【关键】页面加载时，自动触发一次模型列表获取
+            // 延时一点点确保 URL 已经填入
+            setTimeout(function() {
+                if ($('input[data-key="pythonServerUrl"]').val()) {
+                    fetchModelList();
+                    $('#btn-refresh-windows').click(); 
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>
