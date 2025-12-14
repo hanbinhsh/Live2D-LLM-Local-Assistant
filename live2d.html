@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="assets/waifu.css?v=1.4.2"/>
+</head>
+<body style="font-family: 'Microsoft YaHei';">
+    <!-- waifu-tips.js 依赖 JQuery 库 -->
+    <script src="assets/jquery.min.js?v=3.3.1"></script>
+    
+    <!-- 实现拖动效果，需引入 JQuery UI -->
+    <script src="assets/jquery-ui.min.js?v=1.12.1"></script>
+    
+    <div class="waifu">
+        <div class="waifu-tips"></div>
+        <canvas id="live2d" class="live2d"></canvas>
+        <div class="waifu-tool">
+            <span class="fui-home"></span>
+            <span class="fui-chat"></span>
+            <span class="fui-eye"></span>
+            <span class="fui-user"></span>
+            <span class="fui-photo"></span>
+            <span class="fui-info-circle"></span>
+            <span class="fui-cross"></span>
+            <span class="fui-star"></span>
+            <span class="fui-video"></span>
+            <span class="fui-gear"></span>
+        </div>
+        <div class="waifu-chat-box" style="display:none;">
+            <input id="waifu-input" type="text" placeholder="聊点什么？(回车发送)" autocomplete="off">
+            <button id="waifu-send-btn">发送</button>
+        </div>
+        <div class="waifu-settings-panel">
+            <div class="settings-header">
+                <span>看板娘设置</span>
+                <span class="settings-close">×</span>
+            </div>
+            <div class="settings-tabs">
+                <div class="settings-tab-item active" data-tab="peek">Peek设置</div>
+                <!-- 以后可以加更多Tab -->
+            </div>
+            <div class="settings-content">
+                <div id="tab-peek" class="tab-pane">
+                    
+                    <div class="setting-group">
+                        <label class="setting-label">功能模式</label>
+                        <select id="peek-mode" class="waifu-select">
+                            <option value="roast">屏幕吐槽 (Roast)</option>
+                            <option value="chat">聊天助手 (Chat Helper)</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-group">
+                        <label class="setting-label">截图范围</label>
+                        <select id="peek-target-type" class="waifu-select">
+                            <option value="fullscreen">全屏截图</option>
+                            <option value="window">指定窗口</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-group" id="group-window-select" style="display:none;">
+                        <label class="setting-label">
+                            选择窗口 
+                            <button id="btn-refresh-windows" class="waifu-btn secondary" style="padding:2px 5px; font-size:10px;">刷新</button>
+                        </label>
+                        <select id="peek-window-list" class="waifu-select">
+                            <option value="0">请点击刷新...</option>
+                        </select>
+                    </div>
+
+                    <hr style="border:0; border-top:1px dashed #ddd; margin:15px 0;">
+
+                    <div class="setting-group prompt-group" id="group-prompt-roast">
+                        <label class="setting-label">
+                            吐槽模式提示词 
+                            <span style="font-size:10px;color:#888;">可用变量: /window_title, /window_list</span>
+                            <button id="btn-reset-roast" class="waifu-btn secondary" style="padding:1px 5px;font-size:10px;float:right;">重置</button>
+                        </label>
+                        <textarea id="prompt-roast" class="waifu-textarea" placeholder="输入提示词..."></textarea>
+                    </div>
+
+                    <div class="setting-group prompt-group" id="group-prompt-chat" style="display:none;">
+                        <label class="setting-label">
+                            助手模式提示词
+                            <span style="font-size:10px;color:#888;">可用变量: /window_title</span>
+                            <button id="btn-reset-chat" class="waifu-btn secondary" style="padding:1px 5px;font-size:10px;float:right;">重置</button>
+                        </label>
+                        <textarea id="prompt-chat" class="waifu-textarea" placeholder="输入提示词..."></textarea>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+        
+    <script src="assets/waifu-tips.js?v=1.4.2"></script>
+    <script src="assets/live2d.js?v=1.0.5"></script>
+    <script type="text/javascript">
+        /* 在 initModel 前添加 */
+        initModel("assets/waifu-tips.json?v=1.4.2")
+    </script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+打开index.json改一下"textures/default-costume.png"所指向的文件即可
