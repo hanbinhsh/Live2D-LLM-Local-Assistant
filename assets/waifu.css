@@ -473,8 +473,20 @@
 .waifu-btn.secondary { background: #95a5a6; }
 .waifu-btn.secondary:hover { background: #7f8c8d; }
 
-/* 增加一个新的齿轮图标样式 (复用 font awesome 或者 flat ui) */
-.fui-gear:before {
-    content: "\2699"; /* Unicode 齿轮符号，或者用 \e624 如果你有对应字体 */
-    font-family: sans-serif; 
+.setting-section-title {
+    font-weight: bold;
+    color: #3498db;
+    border-left: 3px solid #3498db;
+    padding-left: 8px;
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 13px;
+}
+.checkbox-group input {
+    margin-right: 8px;
 }

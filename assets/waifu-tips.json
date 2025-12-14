@@ -44,6 +44,8 @@
         { "selector": ".fui-info-circle", "text": ["这里有关于我的信息呢"] },
         { "selector": ".fui-cross", "text": ["你不喜欢我了吗..."] },
         { "selector": ".fui-star", "text": ["想和我聊聊天吗？"] },
+        { "selector": ".fui-video", "text": ["让我偷偷看一眼你的屏幕"] },
+        { "selector": ".fui-gear", "text": ["要设置些什么呢？"] },
         { "selector": ".waifu #live2d", "text": ["干嘛呢你，快把手拿开", "鼠…鼠标放错地方了！"] }
     ],
     "click": [

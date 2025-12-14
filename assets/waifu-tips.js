@@ -43,7 +43,7 @@ live2d_settings['canTurnToHomePage']    = false;        // 显示 返回首页  
 live2d_settings['canTurnToAboutPage']   = false;        // 显示 跳转关于页  按钮，可选 true(真), false(假)
 live2d_settings['showLLM']              = true;         // 启用 LLM 对话功能，可选 true(真), false(假)
 live2d_settings['showPeek']             = true;         // 启用手动点击截图功能，可选 true(真), false(假)
-live2d_settings['showSettings']       = true;           // 启用设置功能，可选 true(真), false(假)
+live2d_settings['showSettings']         = true;         // 启用设置功能，可选 true(真), false(假)
 
 // 模型切换模式
 live2d_settings['modelStorage']         = true;         // 记录 ID (刷新后恢复)，可选 true(真), false(假)
@@ -83,10 +83,8 @@ live2d_settings['nowTexturesID']        = 0;
 // LLM对话设置
 
 live2d_settings['llmApiUrl']            = 'http://127.0.0.1:11434/v1/chat/completions'; // API
-live2d_settings['llmApiKey']            = 'sk-xxxxxxxxxxxx'; // Key
-live2d_settings['llmModel']             = 'qwen3-vl:2b-instruct';
+live2d_settings['llmApiKey']            = ''; // Key
 // Peek (屏幕吐槽) 设置
-
 live2d_settings['pythonServerUrl']      = 'http://127.0.0.1:11542/';
 // --- 自动定时吐槽设置 ---
 live2d_settings['autoRoast']            = false;         // 是否开启自动定时截图吐槽 (true: 开启, false: 关闭)
@@ -206,7 +204,7 @@ function empty(obj) {return typeof obj=="undefined"||obj==null||obj==""?true:fal
 function getRandText(text) {return Array.isArray(text) ? text[Math.floor(Math.random() * text.length + 1)-1] : text}
 
 function showMessage(text, timeout, flag) {
-    // 【新增】如果 LLM 正在思考，且当前不是 LLM 主动更新消息（通过 flag 判断或专用变量），则拦截
+    // 如果 LLM 正在思考，且当前不是 LLM 主动更新消息（通过 flag 判断或专用变量），则拦截
     // 我们利用 live2d_settings.isLLMThinking 这个变量作为锁
     // live2d_settings.isLLMWriting 用于允许 LLM 自己更新“思考中”或“回复”的状态
     if (live2d_settings.showLLM && live2d_settings.isLLMThinking && !live2d_settings.isLLMWriting) {
@@ -539,7 +537,15 @@ function loadTipsMessage(result) {
         // --- A. 设置面板与数据管理逻辑 (新增) ---
         
         // 默认配置
-        var defaultPeekSettings = {
+        var defaultSettings = {
+            // 模型选择
+            modelNormal: '',
+            modelThinking: '',
+            // 功能开关
+            useThinkingWaifu: false,
+            useThinkingChat: true,   // 聊天助手默认开思考
+            useThinkingRoast: false,
+            // Peek 设置
             targetType: 'fullscreen',
             targetHwid: 0,
             peekMode: 'roast',
@@ -553,45 +559,61 @@ function loadTipsMessage(result) {
 3. 语气要软萌、可爱、充满元气。\n
 4. 字数控制在50字以内。`,
             chatPrompt: `你是一个智能聊天助手。当前窗口是 '/window_title'。\n
-请阅读图片中的聊天记录或文本内容，结合上下文，为我草拟一个合适的、高情商的回复。\n
-只输出回复内容，不要包含解释。`
+请阅读图片中的聊天记录或文本内容，结合上下文，生成一个合适的、高情商的回复。\n
+请直接给出你此刻会发送的那一句话，你的回复应像真人在即时聊天中自然打出的内容，不要包含解释。`
         };
 
         // 读取设置
-        function loadPeekSettings() {
-            var saved = localStorage.getItem('waifu_peek_settings');
-            if (saved) return $.extend({}, defaultPeekSettings, JSON.parse(saved));
-            return defaultPeekSettings;
+        function loadAllSettings() {
+            var saved = localStorage.getItem('waifu_llm_settings');
+            if (saved) return $.extend({}, defaultSettings, JSON.parse(saved));
+            return defaultSettings;
         }
 
         // 保存设置
-        function savePeekSettings() {
+        function saveAllSettings() {
             var current = {
-                targetType: $('#peek-target-type').val() || 'fullscreen',
-                targetHwid: $('#peek-window-list').val() || 0,
-                peekMode: $('#peek-mode').val() || 'roast',
+                modelNormal: $('#model-normal').val(),
+                modelThinking: $('#model-thinking').val(),
+                
+                useThinkingWaifu: $('#use-thinking-waifu').is(':checked'),
+                useThinkingChat: $('#use-thinking-chat').is(':checked'),
+                useThinkingRoast: $('#use-thinking-roast').is(':checked'),
+
+                targetType: $('#peek-target-type').val(),
+                targetHwid: $('#peek-window-list').val(),
+                peekMode: $('#peek-mode').val(),
                 roastPrompt: $('#prompt-roast').val(),
                 chatPrompt: $('#prompt-chat').val()
             };
-            localStorage.setItem('waifu_peek_settings', JSON.stringify(current));
+            localStorage.setItem('waifu_llm_settings', JSON.stringify(current));
             return current;
         }
 
-        var peekConfig = loadPeekSettings();
+        var cfg = loadAllSettings();
 
         $(document).ready(function() {
-            $('#peek-mode').val(peekConfig.peekMode);
-            $('#peek-target-type').val(peekConfig.targetType);
+            // 恢复开关状态
+            $('#use-thinking-waifu').prop('checked', cfg.useThinkingWaifu);
+            $('#use-thinking-chat').prop('checked', cfg.useThinkingChat);
+            $('#use-thinking-roast').prop('checked', cfg.useThinkingRoast);
             
-            // 如果本地存储为空，或者是第一次加载，填入默认值
-            if (!$('#prompt-roast').val()) $('#prompt-roast').val(peekConfig.roastPrompt);
-            if (!$('#prompt-chat').val()) $('#prompt-chat').val(peekConfig.chatPrompt);
+            // 恢复 Peek 设置
+            $('#peek-mode').val(cfg.peekMode);
+            $('#peek-target-type').val(cfg.targetType);
             
-            toggleSettingsUI();
+            // 恢复提示词 (如果有值)
+            if (!$('#prompt-roast').val()) $('#prompt-roast').val(cfg.roastPrompt);
+            if (!$('#prompt-chat').val()) $('#prompt-chat').val(cfg.chatPrompt);
+
+            toggleUI();
+            
+            // 尝试获取模型列表并恢复选择
+            fetchModelList();
         });
 
         // 切换 UI 显示
-        function toggleSettingsUI() {
+        function toggleUI() {
             var mode = $('#peek-mode').val();
             var target = $('#peek-target-type').val();
             $('.prompt-group').hide();
@@ -605,33 +627,27 @@ function loadTipsMessage(result) {
         $('.waifu-tool .fui-gear').click(function() { $('.waifu-settings-panel').addClass('open'); });
         $('.settings-close').click(function() { 
             $('.waifu-settings-panel').removeClass('open'); 
-            savePeekSettings(); 
+            saveAllSettings(); 
         });
 
         // 监听变动
-        $('#peek-mode, #peek-target-type').change(function() { toggleSettingsUI(); savePeekSettings(); });
-        $('#prompt-roast, #prompt-chat, #peek-window-list').change(function() { savePeekSettings(); });
-
-        // 【新增】重置按钮逻辑
-        $('#btn-reset-roast').click(function() {
-            if(confirm('确定要重置吐槽提示词吗？')) {
-                $('#prompt-roast').val(defaultPeekSettings.roastPrompt);
-                savePeekSettings();
-            }
-        });
-        $('#btn-reset-chat').click(function() {
-            if(confirm('确定要重置助手提示词吗？')) {
-                $('#prompt-chat').val(defaultPeekSettings.chatPrompt);
-                savePeekSettings();
-            }
+        $('.waifu-settings-panel input, .waifu-settings-panel select, .waifu-settings-panel textarea').change(function() {
+            toggleUI();
+            saveAllSettings();
         });
 
-        // 刷新窗口列表按钮
+        // 刷新模型列表
+        $('#btn-refresh-models').click(function() {
+            $(this).text('刷新中...');
+            fetchModelList($(this));
+        });
+
+        // 刷新窗口列表
         $('#btn-refresh-windows').click(async function() {
             var btn = $(this);
-            btn.text('刷新中...');
+            btn.text('...');
             try {
-                var listUrl = live2d_settings.pythonServerUrl + "list_windows";
+                var listUrl = live2d_settings.pythonServerUrl + 'list_windows';
                 const response = await fetch(listUrl);
                 const data = await response.json();
                 var select = $('#peek-window-list');
@@ -639,54 +655,100 @@ function loadTipsMessage(result) {
                 if (data.windows && data.windows.length > 0) {
                     data.windows.forEach(win => { select.append(`<option value="${win.id}">${win.title}</option>`); });
                 } else { select.append('<option value="0">未找到窗口</option>'); }
-            } catch (e) { console.error(e); showMessage('连接后端失败', 3000, true); }
+            } catch (e) { showMessage('连接后端失败', 3000, true); }
             btn.text('刷新');
         });
 
+        // 重置提示词
+        $('#btn-reset-roast').click(function() {
+            if(confirm('重置吐槽提示词？')) { $('#prompt-roast').val(defaultSettings.roastPrompt); saveAllSettings(); }
+        });
+        $('#btn-reset-chat').click(function() {
+            if(confirm('重置助手提示词？')) { $('#prompt-chat').val(defaultSettings.chatPrompt); saveAllSettings(); }
+        });
 
-        // --- B. 原有的 LLM 对话逻辑 (保留不变) ---
+        // 获取模型列表
+        async function fetchModelList(btn) {
+            try {
+                // 调用 Python 后端代理接口
+                var url = live2d_settings.pythonServerUrl + 'list_models';
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                var optionsHtml = '';
+                if (data.models && data.models.length > 0) {
+                    data.models.forEach(m => { optionsHtml += `<option value="${m}">${m}</option>`; });
+                } else {
+                    optionsHtml = '<option value="">未找到模型</option>';
+                }
 
-        // 2. 点击星星：切换底部输入栏的显示状态
+                // 填充两个下拉框
+                $('#model-normal').html(optionsHtml);
+                $('#model-thinking').html(optionsHtml);
+
+                // 恢复之前的选择
+                if (cfg.modelNormal) $('#model-normal').val(cfg.modelNormal);
+                if (cfg.modelThinking) $('#model-thinking').val(cfg.modelThinking);
+                
+                // 如果之前没选，默认选列表第一个
+                if (!$('#model-normal').val() && data.models.length>0) $('#model-normal').val(data.models[0]);
+                if (!$('#model-thinking').val() && data.models.length>0) $('#model-thinking').val(data.models[0]);
+
+            } catch (e) {
+                console.error("Fetch Models Error:", e);
+            }
+            if(btn) btn.text('刷新列表');
+        }
+
+        // 获取当前应该使用的模型 (Normal vs Thinking)
+        function getActiveModel(isThinkingMode) {
+            // 获取最新配置
+            var s = saveAllSettings();
+            var m = isThinkingMode ? s.modelThinking : s.modelNormal;
+            // 如果思考模型没选，回退到普通模型，反之亦然
+            return m || s.modelNormal || s.modelThinking || live2d_settings.llmModel;
+        }
+
+        // === 逻辑 1: 看板娘日常对话 (Waifu Chat) ===
+        // 点击星星：切换底部输入栏的显示状态
         $('.waifu-tool .fui-star').click(function() {
             var chatBox = $('.waifu-chat-box');
-            // 使用 slideToggle 做一个向上滑出的动画效果
             chatBox.slideToggle(200, function() {
-                // 如果显示出来了，就自动聚焦输入框
-                if (chatBox.is(':visible')) {
-                    $('#waifu-input').focus();
-                }
+                if (chatBox.is(':visible')) $('#waifu-input').focus();
             });
         });
+
+        $('#waifu-send-btn').click(sendToLLM);
+        $('#waifu-input').keydown(function(e) { if (e.keyCode === 13) sendToLLM(); });
 
         // 3. 发送逻辑
         async function sendToLLM() {
             var input = $('#waifu-input');
             var text = input.val();
-
             if (!text || text.trim() === '') return;
 
             // 清空输入框并隐藏
             input.val('');
             $('.waifu-chat-box').slideUp(200);
 
-            // === 【新增】 开启思考状态锁 ===
+            // === 思考状态锁 ===
             live2d_settings.isLLMThinking = true; // 开启全局锁，屏蔽一言和触摸
             live2d_settings.isLLMWriting = true;  // 临时允许写入（为了显示“思考中”）
-            
             // 显示思考中 (timeout 设为 0 表示不自动消失)
             showMessage("正在思考中... ( •̀ ω •́ )y", 0, true);
-            
             live2d_settings.isLLMWriting = false; // 写入完毕，锁定，防止其他干扰
+
+            // 决定使用哪个模型
+            var useThinking = $('#use-thinking-waifu').is(':checked');
+            var modelToUse = getActiveModel(useThinking);
+            console.log("Waifu Chat Model:", modelToUse);
 
             try {
                 const response = await fetch(live2d_settings.llmApiUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + live2d_settings.llmApiKey
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + live2d_settings.llmApiKey },
                     body: JSON.stringify({
-                        model: live2d_settings.llmModel,
+                        model: modelToUse,
                         messages: [
                             {"role": "system", "content": "你是一个网页看板娘，请用简短、可爱的语气回答，不要超过50个字。"},
                             {"role": "user", "content": text}
@@ -695,18 +757,14 @@ function loadTipsMessage(result) {
                         stream: false
                     })
                 });
-
                 if (!response.ok) throw new Error('API Error: ' + response.status);
                 const data = await response.json();
-                
                 if (data.choices && data.choices.length > 0) {
                     let reply = data.choices[0].message.content;
-                    
-                    // === 【新增】 准备显示回复，临时开启写入权限 ===
+                    // === 准备显示回复，临时开启写入权限 ===
                     live2d_settings.isLLMWriting = true;
                     showMessage(reply, 6000, true);
                 }
-
             } catch (error) {
                 console.error("LLM Error:", error);
                 live2d_settings.isLLMWriting = true;
@@ -717,29 +775,15 @@ function loadTipsMessage(result) {
             }
         }
 
-        // 4. 绑定发送事件
-        $('#waifu-send-btn').click(sendToLLM);
-        
-        // 绑定回车事件
-        $('#waifu-input').keydown(function(e) {
-            if (e.keyCode === 13) {
-                sendToLLM();
-            }
-        });
-
-        // --- C. 升级版的 Peek 逻辑 (整合设置面板) ---
+        // --- 逻辑 2: 升级版的 Peek 逻辑 ---
         
         // 1. 绑定相机图标点击事件 (使用新的 doPeekAction)
-        $('.waifu-tool .fui-video').off('click').on('click', function() {
-            doPeekAction();
-        });
+        $('.waifu-tool .fui-video').off('click').on('click', function() { doPeekAction(); });
 
         // 2. 根据配置自动启动定时器
         if (live2d_settings.autoRoast) {
             window.roastTimer = setInterval(function() {
-                if (!live2d_settings.isLLMThinking) {
-                    doPeekAction();
-                }
+                if (!live2d_settings.isLLMThinking) doPeekAction();
             }, live2d_settings.roastInterval);
             console.log('[Timer] 自动吐槽已开启，间隔: ' + live2d_settings.roastInterval + 'ms');
         }
@@ -750,33 +794,35 @@ function loadTipsMessage(result) {
             if (live2d_settings.isLLMThinking) return;
 
             // 获取当前设置
-            var cfg = savePeekSettings();
+            var cfg = saveAllSettings(); // 获取最新配置
+            live2d_settings.isLLMThinking = true;
+            live2d_settings.isLLMWriting = true;
 
             // 锁定状态
             live2d_settings.isLLMThinking = true;
             live2d_settings.isLLMWriting = true;
 
             // 根据模式显示不同的提示语
-            if (cfg.peekMode === 'chat') {
-                showMessage("正在分析截图并生成回复，请稍候...", 0, true);
-            } else {
-                showMessage("让我看看你在干什么坏事... (盯)", 0, true);
-            }
+            if (cfg.peekMode === 'chat') showMessage("截图收到！( •̀ ω •́ )✧ 正在认真分析中，请稍等一下下～", 0, true);
+            else showMessage("让我看看你在干什么坏事... (盯)", 0, true);
             
             live2d_settings.isLLMWriting = false;
 
+            var useThinking = (cfg.peekMode === 'chat' && cfg.useThinkingChat) || (cfg.peekMode === 'roast' && cfg.useThinkingRoast);
+            var modelToUse = getActiveModel(useThinking);
+
+            console.log("Peek Model:", modelToUse, "| Mode:", cfg.peekMode);
+
             try {
                 // 构造 Payload
-                var activePrompt = (cfg.peekMode === 'chat') ? cfg.chatPrompt : cfg.roastPrompt;
-                
                 var payload = {
                     target_type: cfg.targetType,
                     target_hwid: parseInt(cfg.targetHwid) || 0,
                     mode: cfg.peekMode,
-                    prompt: activePrompt
+                    prompt: (cfg.peekMode === 'chat') ? cfg.chatPrompt : cfg.roastPrompt,
+                    model: modelToUse
                 };
 
-                // 替换 URL 为 analyze 接口 (兼容旧配置的 see_and_roast 写法)
                 var analyzeUrl = live2d_settings.pythonServerUrl + 'see_and_roast';
 
                 const response = await fetch(analyzeUrl, {
@@ -785,17 +831,17 @@ function loadTipsMessage(result) {
                     body: JSON.stringify(payload)
                 });
 
-                if (!response.ok) throw new Error('Python Server Error');
+                if (!response.ok) throw new Error('Python 后端连接异常');
 
                 const data = await response.json();
                 
-                if (!data.success) throw new Error(data.reply);
+                if (data.success === false) throw new Error(data.reply || "后端未知错误")
 
                 live2d_settings.isLLMWriting = true;
 
                 // 结果处理：聊天助手模式自动复制，吐槽模式直接显示
                 if (cfg.peekMode === 'chat') {
-                    showMessage("回复已生成并复制到剪贴板！\n" + data.reply.substring(0, 20) + "...", 5000, true);
+                    showMessage("回复已经复制到剪贴板啦！\n" + data.reply, 5000, true);
                 } else {
                     showMessage(data.reply, 6000, true);
                 }

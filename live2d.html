@@ -33,63 +33,95 @@
         </div>
         <div class="waifu-settings-panel">
             <div class="settings-header">
-                <span>看板娘设置</span>
+                <span>LLM & 看板娘设置</span>
                 <span class="settings-close">×</span>
             </div>
-            <div class="settings-tabs">
-                <div class="settings-tab-item active" data-tab="peek">Peek设置</div>
-                <!-- 以后可以加更多Tab -->
-            </div>
+            
             <div class="settings-content">
-                <div id="tab-peek" class="tab-pane">
-                    
-                    <div class="setting-group">
-                        <label class="setting-label">功能模式</label>
-                        <select id="peek-mode" class="waifu-select">
-                            <option value="roast">屏幕吐槽 (Roast)</option>
-                            <option value="chat">聊天助手 (Chat Helper)</option>
-                        </select>
-                    </div>
-
-                    <div class="setting-group">
-                        <label class="setting-label">截图范围</label>
-                        <select id="peek-target-type" class="waifu-select">
-                            <option value="fullscreen">全屏截图</option>
-                            <option value="window">指定窗口</option>
-                        </select>
-                    </div>
-
-                    <div class="setting-group" id="group-window-select" style="display:none;">
-                        <label class="setting-label">
-                            选择窗口 
-                            <button id="btn-refresh-windows" class="waifu-btn secondary" style="padding:2px 5px; font-size:10px;">刷新</button>
-                        </label>
-                        <select id="peek-window-list" class="waifu-select">
-                            <option value="0">请点击刷新...</option>
-                        </select>
-                    </div>
-
-                    <hr style="border:0; border-top:1px dashed #ddd; margin:15px 0;">
-
-                    <div class="setting-group prompt-group" id="group-prompt-roast">
-                        <label class="setting-label">
-                            吐槽模式提示词 
-                            <span style="font-size:10px;color:#888;">可用变量: /window_title, /window_list</span>
-                            <button id="btn-reset-roast" class="waifu-btn secondary" style="padding:1px 5px;font-size:10px;float:right;">重置</button>
-                        </label>
-                        <textarea id="prompt-roast" class="waifu-textarea" placeholder="输入提示词..."></textarea>
-                    </div>
-
-                    <div class="setting-group prompt-group" id="group-prompt-chat" style="display:none;">
-                        <label class="setting-label">
-                            助手模式提示词
-                            <span style="font-size:10px;color:#888;">可用变量: /window_title</span>
-                            <button id="btn-reset-chat" class="waifu-btn secondary" style="padding:1px 5px;font-size:10px;float:right;">重置</button>
-                        </label>
-                        <textarea id="prompt-chat" class="waifu-textarea" placeholder="输入提示词..."></textarea>
-                    </div>
-
+                
+                <!-- 1. 模型选择区域 -->
+                <div class="setting-section-title">核心模型设置</div>
+                
+                <div class="setting-group">
+                    <label class="setting-label">
+                        普通模式模型 (响应快)
+                        <button id="btn-refresh-models" class="waifu-btn secondary" style="padding:1px 5px;font-size:10px;float:right;">刷新列表</button>
+                    </label>
+                    <select id="model-normal" class="waifu-select">
+                        <option value="">点击刷新获取列表...</option>
+                    </select>
                 </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">思考/视觉模式模型 (能力强)</label>
+                    <select id="model-thinking" class="waifu-select">
+                        <option value="">点击刷新获取列表...</option>
+                    </select>
+                </div>
+
+                <!-- 2. 思考模式开关 -->
+                <div class="setting-section-title" style="margin-top:15px;">功能开关 (开启后使用思考模型)</div>
+                
+                <div class="setting-group checkbox-group">
+                    <label><input type="checkbox" id="use-thinking-waifu"> 看板娘日常对话 (LLM)</label>
+                </div>
+                <div class="setting-group checkbox-group">
+                    <label><input type="checkbox" id="use-thinking-chat"> 聊天助手 (Peek Chat)</label>
+                </div>
+                <div class="setting-group checkbox-group">
+                    <label><input type="checkbox" id="use-thinking-roast"> 屏幕吐槽 (Peek Roast)</label>
+                </div>
+
+                <hr style="border:0; border-top:1px dashed #ddd; margin:15px 0;">
+
+                <!-- 3. Peek 详细设置 -->
+                <div class="setting-section-title">Peek (屏幕观察) 详细设置</div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Peek 当前模式</label>
+                    <select id="peek-mode" class="waifu-select">
+                        <option value="roast">屏幕吐槽 (Roast)</option>
+                        <option value="chat">聊天助手 (Chat Helper)</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">截图范围</label>
+                    <select id="peek-target-type" class="waifu-select">
+                        <option value="fullscreen">全屏截图</option>
+                        <option value="window">指定窗口</option>
+                    </select>
+                </div>
+
+                <div class="setting-group" id="group-window-select" style="display:none;">
+                    <label class="setting-label">
+                        选择窗口 
+                        <button id="btn-refresh-windows" class="waifu-btn secondary" style="padding:2px 5px; font-size:10px;">刷新</button>
+                    </label>
+                    <select id="peek-window-list" class="waifu-select">
+                        <option value="0">请点击刷新...</option>
+                    </select>
+                </div>
+
+                <!-- 提示词区域 -->
+                <div class="setting-group prompt-group" id="group-prompt-roast" style="margin-top:10px;">
+                    <label class="setting-label">
+                        吐槽提示词 
+                        <span style="font-size:10px;color:#888;">变量: /window_title, /window_list</span>
+                        <button id="btn-reset-roast" class="waifu-btn secondary" style="padding:1px 5px;font-size:10px;float:right;">重置</button>
+                    </label>
+                    <textarea id="prompt-roast" class="waifu-textarea" placeholder="输入提示词..."></textarea>
+                </div>
+
+                <div class="setting-group prompt-group" id="group-prompt-chat" style="display:none; margin-top:10px;">
+                    <label class="setting-label">
+                        助手提示词
+                        <span style="font-size:10px;color:#888;">变量: /window_title</span>
+                        <button id="btn-reset-chat" class="waifu-btn secondary" style="padding:1px 5px;font-size:10px;float:right;">重置</button>
+                    </label>
+                    <textarea id="prompt-chat" class="waifu-textarea" placeholder="输入提示词..."></textarea>
+                </div>
+
             </div>
         </div>
     </div>

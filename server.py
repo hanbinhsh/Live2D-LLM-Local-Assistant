@@ -22,9 +22,10 @@ app.add_middleware(
 )
 
 # 配置
-OLLAMA_API = "http://127.0.0.1:11434/api/generate"
-TARGET_SIZE = (1280, 720)
 
+OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+OLLAMA_API = OLLAMA_BASE_URL + "/api/generate"
+TARGET_SIZE = (1280, 720)
 
 # === 请求体定义 ===
 class AnalyzeRequest(BaseModel):
@@ -194,7 +195,7 @@ def see_and_roast(req: AnalyzeRequest):
     chatPrompt = (
         f"你是一个智能聊天助手。当前窗口是 '/window_title'。\n"
         f"请阅读图片中的聊天记录或文本内容，结合上下文，为我草拟一个合适的、高情商的回复。\n"
-        f"只输出回复内容，不要包含解释。"
+        f"请直接给出你此刻会发送的那一句话，你的回复应像真人在即时聊天中自然打出的内容，不要包含解释。"
     )
 
     if not raw_prompt:
@@ -207,7 +208,7 @@ def see_and_roast(req: AnalyzeRequest):
     # === 替换占位符 ===
     final_prompt = raw_prompt.replace("/window_title", active_window).replace("/window_list", other_windows_str)
 
-    print(f"使用的 Prompt: {final_prompt}")
+    # print(f"使用的 Prompt: {final_prompt}")
 
     # 4. 发送给 Ollama
     payload = {
