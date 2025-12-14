@@ -83,11 +83,11 @@ live2d_settings['nowTexturesID']        = 0;
 // LLM对话设置
 
 live2d_settings['llmApiUrl']            = 'http://127.0.0.1:11434/v1/chat/completions'; // API
-live2d_settings['llmApiKey']            = ''; // Key
+live2d_settings['llmApiKey']            = '';           // Key
 // Peek (屏幕吐槽) 设置
 live2d_settings['pythonServerUrl']      = 'http://127.0.0.1:11542/';
 // --- 自动定时吐槽设置 ---
-live2d_settings['autoRoast']            = false;         // 是否开启自动定时截图吐槽 (true: 开启, false: 关闭)
+live2d_settings['autoRoast']            = false;        // 是否开启自动定时截图吐槽 (true: 开启, false: 关闭)
 live2d_settings['roastInterval']        = 60000;        // 自动吐槽间隔 (单位: 毫秒)，300000 = 5分钟
 
 try {
@@ -247,6 +247,29 @@ function hideMessage(timeout) {
 }
 
 function initModel(waifuPath, type) {
+    $(document).ready(function() {
+        // 初始化设置面板
+        initSettingsPanel();
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'waifu_global_settings' || e.key === 'waifu_llm_settings') {
+                console.log('检测到设置变更，正在同步...');
+                
+                // 重新读取配置
+                try {
+                    var saved = localStorage.getItem('waifu_global_settings');
+                    if (saved) $.extend(live2d_settings, JSON.parse(saved));
+                    
+                    // 重新应用设置 (调用之前我给你的辅助函数)
+                    // 注意：你需要遍历 live2d_settings 的 key 来应用，或者只针对关键设置做处理
+                    if (typeof applyImmediateChanges === 'function') {
+                        for(var k in live2d_settings) {
+                            applyImmediateChanges(k, live2d_settings[k]);
+                        }
+                    }
+                } catch(err) {}
+            }
+        });
+    });
     // ==========================================
     //       新增：全局设置面板绑定逻辑
     // ==========================================
@@ -361,33 +384,6 @@ function initModel(waifuPath, type) {
             else $(".waifu").draggable('enable');
         }
     }
-
-    // ==========================================
-    //           在代码末尾调用初始化
-    // ==========================================
-    $(document).ready(function() {
-        // 初始化设置面板
-        initSettingsPanel();
-        window.addEventListener('storage', function(e) {
-            if (e.key === 'waifu_global_settings' || e.key === 'waifu_llm_settings') {
-                console.log('检测到设置变更，正在同步...');
-                
-                // 重新读取配置
-                try {
-                    var saved = localStorage.getItem('waifu_global_settings');
-                    if (saved) $.extend(live2d_settings, JSON.parse(saved));
-                    
-                    // 重新应用设置 (调用之前我给你的辅助函数)
-                    // 注意：你需要遍历 live2d_settings 的 key 来应用，或者只针对关键设置做处理
-                    if (typeof applyImmediateChanges === 'function') {
-                        for(var k in live2d_settings) {
-                            applyImmediateChanges(k, live2d_settings[k]);
-                        }
-                    }
-                } catch(err) {}
-            }
-        });
-    });
 
     // 等待 staticAPI 加载完成
     if (!staticAPILoaded) {
@@ -566,6 +562,17 @@ function loadTipsMessage(result) {
         showMessage(getRandText(result.waifu.hidden_message), 1300, true);
         window.setTimeout(function() {$('.waifu').hide();}, 1300);
     });
+
+    $('#btn-clear-memory').click(function() {
+        if(confirm('确定要让看板娘忘记之前的所有对话吗？')) {
+            window.resetChatMemory();
+        }
+    });
+
+    window.resetChatMemory = function() {
+        localStorage.removeItem('waifu_chat_history');
+        showMessage("记忆已重置！我们可以重新认识一下啦~", 4000, true);
+    }
     
     window.showWelcomeMessage = function(result) {
         var text;
@@ -708,7 +715,10 @@ function loadTipsMessage(result) {
 4. 字数控制在50字以内。`,
         chatPrompt: `你是一个智能聊天助手。当前窗口是 '/window_title'。\n
 请阅读图片中的聊天记录或文本内容，结合上下文，生成一个合适的、高情商的回复。\n
-请直接给出你此刻会发送的那一句话，你的回复应像真人在即时聊天中自然打出的内容，不要包含解释。`
+请直接给出你此刻会发送的那一句话，你的回复应像真人在即时聊天中自然打出的内容，不要包含解释。`,
+        // 记忆设置
+        useMemory: true,
+        memoryLimit: 10
     };
     // 读取设置
     function loadAllSettings() {
@@ -721,7 +731,6 @@ function loadTipsMessage(result) {
         var current = {
             modelNormal: $('#model-normal').val(),
             modelThinking: $('#model-thinking').val(),
-            
             useThinkingWaifu: $('#use-thinking-waifu').is(':checked'),
             useThinkingChat: $('#use-thinking-chat').is(':checked'),
             useThinkingRoast: $('#use-thinking-roast').is(':checked'),
@@ -729,12 +738,16 @@ function loadTipsMessage(result) {
             targetHwid: $('#peek-window-list').val(),
             peekMode: $('#peek-mode').val(),
             roastPrompt: $('#prompt-roast').val(),
-            chatPrompt: $('#prompt-chat').val()
+            chatPrompt: $('#prompt-chat').val(),
+            useMemory: $('#use-memory').is(':checked'),
+            memoryLimit: $('#memory-limit').val()
         };
         localStorage.setItem('waifu_llm_settings', JSON.stringify(current));
         return current;
     }
+
     var cfg = loadAllSettings();
+
     $(document).ready(function() {
         // 恢复开关状态
         $('#use-thinking-waifu').prop('checked', cfg.useThinkingWaifu);
@@ -748,6 +761,11 @@ function loadTipsMessage(result) {
         // 恢复提示词 (如果有值)
         if (!$('#prompt-roast').val()) $('#prompt-roast').val(cfg.roastPrompt);
         if (!$('#prompt-chat').val()) $('#prompt-chat').val(cfg.chatPrompt);
+
+        // 回复记忆设置
+        $('#use-memory').prop('checked', cfg.useMemory !== false); // 默认开启(如果不为false)
+        $('#memory-limit').val(cfg.memoryLimit || 10); // 默认10轮
+
         toggleUI();
         
         // 尝试获取模型列表并恢复选择
@@ -871,6 +889,9 @@ function loadTipsMessage(result) {
         var input = $('#waifu-input');
         var text = input.val();
         if (!text || text.trim() === '') return;
+
+        var cfg = saveAllSettings(); // 获取最新配置
+        
         // 清空输入框并隐藏
         input.val('');
         $('.waifu-chat-box').slideUp(200);
@@ -881,35 +902,79 @@ function loadTipsMessage(result) {
         showMessage("正在思考中... ( •̀ ω •́ )y", 0, true);
         live2d_settings.isLLMWriting = false; // 写入完毕，锁定，防止其他干扰
         // 决定使用哪个模型
-        var useThinking = $('#use-thinking-waifu').is(':checked');
+        var useThinking = cfg.useThinkingWaifu;
         var modelToUse = getActiveModel(useThinking);
         console.log("Waifu Chat Model:", modelToUse);
+
+        console.log("记忆开关:", cfg.useMemory, "| 记忆轮数:", cfg.memoryLimit);
+
+        var messages = [];
+        var systemPrompt = {"role": "system", "content": "你是一个网页看板娘，请用简短、可爱的语气回答，不要超过50个字。"};
+
+        // 1. 读取历史
+        var history = [];
+        if (cfg.useMemory) {
+            try {
+                var savedHistory = localStorage.getItem('waifu_chat_history');
+                if (savedHistory) {
+                    history = JSON.parse(savedHistory);
+                }
+            } catch (e) { console.error("对话历史加载失败：", e); }
+        }
+
+        // 2. 构建本次请求的消息列表 (System + History + Current User)
+        messages.push(systemPrompt);
+        messages = messages.concat(history);
+        messages.push({"role": "user", "content": text});
+
         try {
             const response = await fetch(live2d_settings.llmApiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + live2d_settings.llmApiKey },
                 body: JSON.stringify({
                     model: modelToUse,
-                    messages: [
-                        {"role": "system", "content": "你是一个网页看板娘，请用简短、可爱的语气回答，不要超过50个字。"},
-                        {"role": "user", "content": text}
-                    ],
+                    messages: messages, // 发送包含历史的消息组
                     temperature: 0.7,
                     stream: false
                 })
             });
+
             if (!response.ok) throw new Error('API Error: ' + response.status);
             const data = await response.json();
+
             if (data.choices && data.choices.length > 0) {
                 let reply = data.choices[0].message.content;
                 // === 准备显示回复，临时开启写入权限 ===
                 live2d_settings.isLLMWriting = true;
                 showMessage(reply, 6000, true);
+                if (cfg.useMemory) {
+                    // 推入新对话
+                    history.push({"role": "user", "content": text});
+                    history.push({"role": "assistant", "content": reply});
+
+                    // 限制条数 (1轮 = 2条消息)
+                    var limit = parseInt(cfg.memoryLimit) || 10;
+                    var maxMsgs = limit * 2;
+
+                    console.log("当前历史长度:", history.length, "| 限制:", maxMsgs);
+                    
+                    // 如果超出限制，保留最近的 N 条
+                    if (history.length > maxMsgs) {
+                        history = history.slice(history.length - maxMsgs);
+                        console.log("对话历史已截断至", maxMsgs, "条消息");
+                    }
+
+                    localStorage.setItem('waifu_chat_history', JSON.stringify(history));
+                    console.log("对话历史已保存,共", history.length, "条消息");
+                }
             }
         } catch (error) {
             console.error("LLM Error:", error);
             live2d_settings.isLLMWriting = true;
             showMessage("呜呜，大脑短路了... 请检查连接配置", 4000, true);
+            // 出错时，把刚刚存进去的用户消息删掉，防止下次请求带上错误的上下文
+            if (history.length > 0) history.pop(); 
+            localStorage.setItem('waifu_chat_history', JSON.stringify(history));
         } finally {
             live2d_settings.isLLMThinking = false; // 解除锁，恢复一言和触摸
             live2d_settings.isLLMWriting = false;
@@ -933,9 +998,6 @@ function loadTipsMessage(result) {
 
        // 获取当前设置
        var cfg = saveAllSettings(); // 获取最新配置
-       live2d_settings.isLLMThinking = true;
-       live2d_settings.isLLMWriting = true;
-
        // 锁定状态
        live2d_settings.isLLMThinking = true;
        live2d_settings.isLLMWriting = true;

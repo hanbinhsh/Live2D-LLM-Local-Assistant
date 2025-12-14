@@ -408,6 +408,19 @@
                     <label><input id="use-thinking-chat" class="llm-item" type="checkbox"> 聊天助手使用思考模型</label>
                     <label><input id="use-thinking-roast" class="llm-item" type="checkbox"> 屏幕吐槽使用思考模型</label>
                 </div>
+
+                <div class="setting-section-title">对话记忆</div>
+                <div class="setting-group checkbox-group">
+                    <label><input id="use-memory" class="llm-item" type="checkbox"> 多轮对话记忆</label>
+                    <span style="font-size:12px;color:#999;">看板娘会记得你说过的话 (刷新网页依然有效)</span>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">记忆轮数限制 (1轮=一问一答)</label>
+                    <div style="display:flex; gap:10px;">
+                        <input id="memory-limit" class="waifu-select llm-item" type="number" placeholder="10" style="width:80px; flex:none;">
+                        <button id="btn-clear-memory" class="waifu-btn secondary">清除记忆</button>
+                    </div>
+                </div>
                 
                 <div class="setting-section-title">定时设置</div>
                 <div class="setting-group">
@@ -554,6 +567,8 @@
                 $('#peek-target-type').val(configLLM.targetType || 'fullscreen');
                 $('#prompt-roast').val(configLLM.roastPrompt);
                 $('#prompt-chat').val(configLLM.chatPrompt);
+                $('#use-memory').prop('checked', configLLM.useMemory !== false); // 默认开启(如果不为false)
+                $('#memory-limit').val(configLLM.memoryLimit || 10); // 默认10轮
 
                 toggleLLMUI(); // 刷新 UI 显示状态
             }
@@ -595,6 +610,8 @@
                 currentLLM.targetHwid = $('#peek-window-list').val();
                 currentLLM.roastPrompt = $('#prompt-roast').val();
                 currentLLM.chatPrompt = $('#prompt-chat').val();
+                currentLLM.useMemory = $('#use-memory').is(':checked');
+                currentLLM.memoryLimit = $('#memory-limit').val();
                 
                 localStorage.setItem('waifu_llm_settings', JSON.stringify(currentLLM));
             }

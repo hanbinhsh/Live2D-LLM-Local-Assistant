@@ -323,12 +323,15 @@
     border-top: 1px solid #e0e0e0;
     box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
     z-index: 100; /* 确保在模型图层之上 */
+    opacity: 0.85;
     
     /* 内部布局 */
     display: flex; 
     align-items: center;
     padding: 0;
     box-sizing: border-box;
+    border-radius: 10px;
+    margin-bottom: 5px;
 }
 
 /* 输入框 */
@@ -341,6 +344,7 @@
     height: 100%;
     outline: none;
     color: #555;
+    border-radius: 10px;
 }
 
 #waifu-input::placeholder {
@@ -349,14 +353,20 @@
 
 /* 发送按钮 */
 #waifu-send-btn {
-    width: 50px;
-    height: 100%;
+    width: 32px;
+    height: 32px;
     border: none;
     background-color: #3498db;
     color: white;
     font-size: 12px;
     cursor: pointer;
     transition: background 0.2s;
+    border-radius: 10px;
+    margin-bottom: 1px;
+}
+
+.fui-triangle-right-large:before {
+    content: "\e605";
 }
 
 #waifu-send-btn:hover {
@@ -388,6 +398,8 @@
     font-size: 14px;
     color: #333;
     font-family: "Microsoft YaHei", sans-serif;
+    border-radius: 10px;
+    opacity: 0.95;
 }
 
 .waifu-settings-panel.open {
@@ -396,13 +408,14 @@
 
 /* 标题栏 */
 .settings-header {
-    padding: 15px;
+    padding: 10px;
     background: #f5f5f5;
     border-bottom: 1px solid #ddd;
     font-weight: bold;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border-radius: 10px 10px 0 0;
 }
 .settings-close {
     cursor: pointer;
