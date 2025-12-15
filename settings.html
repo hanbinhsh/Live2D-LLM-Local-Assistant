@@ -410,12 +410,27 @@
                     // 列表刷新后，重新从 LocalStorage 恢复选中的值
                     // 否则下拉框会重置为第一个选项
                     var saved = JSON.parse(localStorage.getItem('waifu_global_settings') || '{}');
-                    if (saved.modelNormal) $('#model-normal').val(saved.modelNormal);
-                    if (saved.modelThinking) $('#model-thinking').val(saved.modelThinking);
-                    
+                    if (saved.modelNormal){
+                        if($('#model-normal option[value="' + saved.modelNormal + '"]').length === 0)
+                            $('#model-normal').html(`<option value="${saved.modelNormal}">${saved.modelNormal}</option>`);
+                        $('#model-normal').val(saved.modelNormal);
+                    }
+                        
+                    if (saved.modelThinking){
+                        if ($('#model-thinking option[value="' + saved.modelThinking + '"]').length === 0)
+                            $('#model-thinking').html(`<option value="${saved.modelThinking}">${saved.modelThinking}</option>`);
+                        $('#model-thinking').val(saved.modelThinking);
+                    }
                 } catch (e) {
-                    // console.error(e);
-                    // 保持静默或显示友好提示
+                    console.error("模型列表获取失败：", e);
+                    if (saved.modelNormal){
+                        $('#model-normal').html(`<option value="${saved.modelNormal}">${saved.modelNormal} (离线)</option>`);
+                        $('#model-normal').val(saved.modelNormal);
+                    }
+                    if (saved.modelThinking){
+                        $('#model-thinking').html(`<option value="${saved.modelThinking}">${saved.modelThinking} (离线)</option>`);
+                        $('#model-thinking').val(saved.modelThinking);
+                    }
                 } finally {
                     $btn.text('刷新列表');
                 }
@@ -423,6 +438,12 @@
 
             $('#btn-refresh-models').click(function() {
                 fetchModelList();
+            });
+
+            $('#btn-clear-memory').click(function() {
+                if(confirm('确定要让看板娘忘记之前的所有对话吗？')) {
+                    localStorage.removeItem('waifu_chat_history');
+                }
             });
 
             $('#btn-refresh-windows').click(async function() {

@@ -180,6 +180,28 @@ $.getJSON(live2d_settings.staticAPIFile, function(result){
     console.error('[Error] Failed to load static API:', error);
 });
 
+// 终止模型思考
+var llmAbortController = null;
+function stopLLMGeneration() {
+    if (llmAbortController) {
+        llmAbortController.abort(); // 1. 中止网络请求
+        llmAbortController = null;
+    }
+    
+    // 2. 重置状态锁
+    live2d_settings.isLLMThinking = false; 
+    live2d_settings.isLLMWriting = false;
+    
+    // 3. 界面反馈
+    // showMessage("已强制终止思考。(>_<)", 2000, true);
+    $('.waifu-tool .fui-pause').hide(); // 隐藏停止按钮
+}
+
+// --- 绑定按钮事件 ---
+$(document).on('click', '.waifu-tool .fui-pause', function() {
+    stopLLMGeneration();
+});
+
 function localAPI(action, modelID, texturesID=0){
     // modelID = modelID > 0 ? modelID-1 : 0;
     // texturesID = texturesID > 0 ? texturesID-1 : 0;
@@ -402,8 +424,6 @@ function initModel(waifuPath, type) {
         if (key === 'canTakeScreenshot') toggleBtn($('.waifu-tool .fui-photo'), val);
         if (key === 'canTurnToAboutPage') toggleBtn($('.waifu-tool .fui-info-circle'), val);
         if (key === 'canCloseLive2d') toggleBtn($('.waifu-tool .fui-cross'), val);
-        
-        // 扩展功能按钮
         if (key === 'showLLM') toggleBtn($('.waifu-tool .fui-star'), val); 
         if (key === 'showPeek') toggleBtn($('.waifu-tool .fui-video'), val); 
         if (key === 'showSettings') toggleBtn($('.waifu-tool .fui-gear'), val); 
@@ -474,6 +494,7 @@ function initModel(waifuPath, type) {
     for (var k in live2d_settings) {
         applyImmediateChanges(k, live2d_settings[k]);
     }
+    $('.waifu-tool .fui-pause').hide(); // 隐藏停止按钮
 
     if (waifuPath === undefined) waifuPath = '';
     var modelId, modelTexturesId;
@@ -584,8 +605,17 @@ function initModel(waifuPath, type) {
             }
             $('#model-normal').html(optionsHtml);
             $('#model-thinking').html(optionsHtml);
-            if (live2d_settings.modelNormal) $('#model-normal').val(live2d_settings.modelNormal);
-            if (live2d_settings.modelThinking) $('#model-thinking').val(live2d_settings.modelThinking);
+            if (live2d_settings.modelNormal){
+                if($('#model-normal option[value="' + live2d_settings.modelNormal + '"]').length === 0)
+                    $('#model-normal').html(`<option value="${live2d_settings.modelNormal}">${live2d_settings.modelNormal}</option>`);
+                $('#model-normal').val(live2d_settings.modelNormal);
+            }
+                
+            if (live2d_settings.modelThinking){
+                if ($('#model-thinking option[value="' + live2d_settings.modelThinking + '"]').length === 0)
+                    $('#model-thinking').html(`<option value="${live2d_settings.modelThinking}">${live2d_settings.modelThinking}</option>`);
+                $('#model-thinking').val(live2d_settings.modelThinking);
+            }
             
             if (!$('#model-normal').val() && data.models.length>0) {
                 $('#model-normal').val(data.models[0]);
@@ -595,7 +625,17 @@ function initModel(waifuPath, type) {
                 $('#model-thinking').val(data.models[0]);
                 live2d_settings.modelThinking = data.models[0];
             }
-        } catch (e) { console.error("Fetch Models Error:", e); }
+        } catch (e) {
+            console.error("模型列表获取失败：", e);
+            if (live2d_settings.modelNormal){
+                $('#model-normal').html(`<option value="${live2d_settings.modelNormal}">${live2d_settings.modelNormal} (离线)</option>`);
+                $('#model-normal').val(live2d_settings.modelNormal);
+            }
+            if (live2d_settings.modelThinking){
+                $('#model-thinking').html(`<option value="${live2d_settings.modelThinking}">${live2d_settings.modelThinking} (离线)</option>`);
+                $('#model-thinking').val(live2d_settings.modelThinking);
+            }
+        }
         if(btn) btn.text('刷新列表');
     }
 
@@ -626,6 +666,9 @@ function initModel(waifuPath, type) {
         showMessage("正在思考中... ( •̀ ω •́ )y", 0, true);
         live2d_settings.isLLMWriting = false;
 
+        // 显示停止思考按钮
+        $('.waifu-tool .fui-pause').show();
+
         var useThinking = live2d_settings.useThinkingWaifu;
         var modelToUse = getActiveModel(useThinking);
 
@@ -649,8 +692,11 @@ function initModel(waifuPath, type) {
         messages.push({"role": "user", "content": text});
 
         try {
+            llmAbortController = new AbortController(); 
+
             const response = await fetch(live2d_settings.llmApiUrl, {
                 method: 'POST',
+                signal: llmAbortController.signal,
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + live2d_settings.llmApiKey },
                 body: JSON.stringify({
                     model: modelToUse,
@@ -689,15 +735,20 @@ function initModel(waifuPath, type) {
                 }
             }
         } catch (error) {
-            console.error("LLM Error:", error);
-            live2d_settings.isLLMWriting = true;
-            showMessage("呜呜，大脑短路了... 请检查连接配置", 4000, true);
-            // 出错时，把刚刚存进去的用户消息删掉，防止下次请求带上错误的上下文
-            if (history.length > 0) history.pop(); 
-            localStorage.setItem('waifu_chat_history', JSON.stringify(history));
+            if (error.name === 'AbortError') {
+                console.log('用户手动请求中止。');
+                live2d_settings.isLLMWriting = true;
+                showMessage("思考被中止了(>_<)... ", 4000, true)
+            } else {
+                console.error("LLM Error:", error);
+                live2d_settings.isLLMWriting = true;
+                showMessage("呜呜，大脑短路了... ", 4000, true);
+            }
         } finally {
             live2d_settings.isLLMThinking = false;
             live2d_settings.isLLMWriting = false;
+            llmAbortController = null;
+            $('.waifu-tool .fui-pause').hide(); // 隐藏停止按钮
         }
     }
 
@@ -712,60 +763,74 @@ function initModel(waifuPath, type) {
     }
 
     async function doPeekAction() {
-       if (live2d_settings.isLLMThinking) return;
+        if (live2d_settings.isLLMThinking) return;
 
-       live2d_settings.isLLMThinking = true;
-       live2d_settings.isLLMWriting = true;
+        live2d_settings.isLLMThinking = true;
+        live2d_settings.isLLMWriting = true;
 
-       // 根据模式显示不同的提示语
-       if (live2d_settings.peekMode === 'chat') showMessage("截图收到！( •̀ ω •́ )✧ 正在认真分析中，请稍等一下下～", 0, true);
-       else showMessage("让我看看你在干什么坏事... (盯)", 0, true);
+        // 根据模式显示不同的提示语
+        if (live2d_settings.peekMode === 'chat') showMessage("截图收到！( •̀ ω •́ )✧ 正在认真分析中，请稍等一下下～", 0, true);
+        else showMessage("让我看看你在干什么坏事... (盯)", 0, true);
        
-       live2d_settings.isLLMWriting = false;
+        live2d_settings.isLLMWriting = false;
 
-       var useThinking = (live2d_settings.peekMode === 'chat' && live2d_settings.useThinkingChat) || (live2d_settings.peekMode === 'roast' && live2d_settings.useThinkingRoast);
-       var modelToUse = getActiveModel(useThinking);
+        // 显示停止按钮
+        $('.waifu-tool .fui-pause').show();
 
-       console.log("Peek Model:", modelToUse, "| Mode:", live2d_settings.peekMode);
+        var useThinking = (live2d_settings.peekMode === 'chat' && live2d_settings.useThinkingChat) || (live2d_settings.peekMode === 'roast' && live2d_settings.useThinkingRoast);
+        var modelToUse = getActiveModel(useThinking);
 
-       try {
-           var payload = {
-               target_type: live2d_settings.targetType,
-               target_hwid: parseInt(live2d_settings.targetHwid) || 0,
-               mode: live2d_settings.peekMode,
-               prompt: (live2d_settings.peekMode === 'chat') ? live2d_settings.chatPrompt : live2d_settings.roastPrompt,
-               model: modelToUse
-           };
+        console.log("Peek Model:", modelToUse, "| Mode:", live2d_settings.peekMode);
 
-           const response = await fetch(live2d_settings.pythonServerUrl + 'see_and_roast', {
-               method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify(payload)
-           });
+        try {
+            var payload = {
+                target_type: live2d_settings.targetType,
+                target_hwid: parseInt(live2d_settings.targetHwid) || 0,
+                mode: live2d_settings.peekMode,
+                prompt: (live2d_settings.peekMode === 'chat') ? live2d_settings.chatPrompt : live2d_settings.roastPrompt,
+                model: modelToUse
+            };
 
-           if (!response.ok) throw new Error('Python 后端连接异常');
-           const data = await response.json();
+            llmAbortController = new AbortController();
+
+            const response = await fetch(live2d_settings.pythonServerUrl + 'see_and_roast', {
+                signal: llmAbortController.signal,
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error('Python 后端连接异常');
+            const data = await response.json();
            
-           if (data.success === false) throw new Error(data.reply || "后端未知错误")
+            if (data.success === false) throw new Error(data.reply || "后端未知错误")
 
-           live2d_settings.isLLMWriting = true;
+            live2d_settings.isLLMWriting = true;
 
-           // 结果处理：聊天助手模式自动复制，吐槽模式直接显示
-           if (live2d_settings.peekMode === 'chat') {
-               showMessage("回复已经复制到剪贴板啦！\n" + data.reply, 5000, true);
-           } else {
-               showMessage(data.reply, 6000, true);
-           }
+            // 结果处理：聊天助手模式自动复制，吐槽模式直接显示
+            if (live2d_settings.peekMode === 'chat') {
+                showMessage("回复已经复制到剪贴板啦！\n" + data.reply, 5000, true);
+            } else {
+                showMessage(data.reply, 6000, true);
+            }
 
-       } catch (error) {
-           console.error("Peek Error:", error);
-           live2d_settings.isLLMWriting = true;
-           showMessage("我看不到屏幕了... 是不是 Python 脚本没运行？", 4000, true)
-       } finally {
-           // 解锁
-           live2d_settings.isLLMThinking = false;
-           live2d_settings.isLLMWriting = false;
-       }
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                console.log('Peek请求被中止');
+                live2d_settings.isLLMWriting = true;
+                showMessage("好吧，那我不看就是了。", 4000, true)
+            } else {
+                console.error("Peek Error:", error);
+                live2d_settings.isLLMWriting = true;
+                showMessage("我看不到屏幕了... 是不是 Python 脚本没运行？", 4000, true)
+            }
+        } finally {
+            // 解锁
+            live2d_settings.isLLMThinking = false;
+            live2d_settings.isLLMWriting = false;
+            llmAbortController = null;
+            $('.waifu-tool .fui-pause').hide(); // 隐藏停止按钮
+        }
     }
 }
 
@@ -880,7 +945,7 @@ function loadTipsMessage(result) {
                 }
             } else text = referrer_message.none[0] + document.title.split(referrer_message.none[2])[0] + referrer_message.none[1];
         }
-        showMessage(text, 6000);
+        showMessage(text, 6000, true);
     }; if (live2d_settings.showWelcomeMessage) showWelcomeMessage(result);
     
     var waifu_tips = result.waifu;

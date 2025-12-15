@@ -377,6 +377,13 @@
     content: "\e629"
 }
 
+.fui-pause:before {
+    content: "\e615";
+    top: 0px;
+    right: 25px;
+    position: absolute;
+}
+
 /* 设置图标 */
 .fui-gear:before {
     content: "\e636"

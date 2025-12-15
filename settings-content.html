@@ -160,6 +160,13 @@
             <div style="display:flex; gap:10px;">
                 <input id="memory-limit" data-key="memoryLimit" class="waifu-select llm-item config-item" type="number" placeholder="10" style="width:80px; flex:none;">
                 <button id="btn-clear-memory" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">清除记忆</button>
+                <button id="btn-export-history" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">
+                    导出记录
+                </button>
+                <button id="btn-import-history" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">
+                    导入记录
+                </button>
+                <input type="file" id="file-import-input" accept=".json" style="display:none;">
             </div>
         </div>
         <div class="setting-section-title" style="margin-top:15px;">自动与定时</div>
@@ -224,3 +231,77 @@
         部分设置刷新网页后生效
     </div>
 </div>
+
+<script>
+    $('#btn-export-history').click(function() {
+        // 1. 获取数据
+        var historyStr = localStorage.getItem('waifu_chat_history');
+        if (!historyStr || historyStr === '[]') {
+            alert('当前没有聊天记录可导出。');
+            return;
+        }
+
+        try {
+            // 2. 格式化 JSON 为了可读性 (可选，如果文件太大可以去掉 null, 2)
+            var formattedJson = JSON.stringify(JSON.parse(historyStr), null, 2);
+            
+            // 3. 创建 Blob 对象
+            var blob = new Blob([formattedJson], {type: "application/json"});
+            var url = URL.createObjectURL(blob);
+            
+            // 4. 创建临时下载链接并点击
+            var a = document.createElement('a');
+            a.href = url;
+            // 生成文件名: waifu_history_2023-10-27.json
+            var dateStr = new Date().toISOString().split('T')[0];
+            a.download = 'waifu_chat_history_' + dateStr + '.json';
+            document.body.appendChild(a);
+            a.click();
+            
+            // 5. 清理
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error(e);
+            alert('导出失败，数据格式可能损坏。');
+        }
+    });
+
+    // --- 导入聊天记录 (点击按钮触发文件选择) ---
+    $('#btn-import-history').click(function() {
+        $('#file-import-input').click();
+    });
+
+    // --- 导入逻辑 (文件选择后) ---
+    $('#file-import-input').change(function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var jsonStr = e.target.result;
+                // 1. 尝试解析以验证是否为合法 JSON
+                var json = JSON.parse(jsonStr);
+                
+                // 2. 简单验证格式 (必须是数组)
+                if (!Array.isArray(json)) {
+                    throw new Error("文件格式错误：聊天记录必须是数组列表");
+                }
+
+                // 3. 确认覆盖
+                if (confirm('导入将覆盖当前所有的聊天记忆，确定要继续吗？')) {
+                    localStorage.setItem('waifu_chat_history', JSON.stringify(json));
+                    alert('导入成功！');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('导入失败：文件内容不是有效的 JSON 格式。\n' + err.message);
+            }
+            // 清空 input 使得同一个文件可以再次被选中
+            $('#file-import-input').val('');
+        };
+        // 读取文件
+        reader.readAsText(file);
+    });
+</script>
