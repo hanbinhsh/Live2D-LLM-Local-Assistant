@@ -138,16 +138,8 @@ try {
     // 1. 加载所有设置到 live2d_settings
     var saved = localStorage.getItem('waifu_global_settings');
     var savedObj = saved ? JSON.parse(saved) : {};
-    
-    // 2. 兼容性处理：如果以前有 waifu_llm_settings，尝试合并过来并删除旧的
-    var legacyLLM = localStorage.getItem('waifu_llm_settings');
-    if (legacyLLM) {
-        console.log('[Info] 检测到旧版 LLM 设置，正在迁移...');
-        $.extend(savedObj, JSON.parse(legacyLLM));
-        localStorage.removeItem('waifu_llm_settings'); // 移除旧Key
-    }
 
-    // 3. 深度合并：默认值 -> 本地存储值
+    // 2. 深度合并：默认值 -> 本地存储值
     // 使用 $.extend(true, ...) 如果需要深拷贝，或者简单的一层合并
     // 这里使用 Object.assign 或 $.extend 均可
     window.live2d_settings = $.extend({}, default_settings, savedObj);
