@@ -393,7 +393,7 @@
     box-shadow: 2px 0 10px rgba(0,0,0,0.1);
     z-index: 10001; /* 确保比 waifu 高 */
     transition: left 0.3s ease;
-    display: flex;
+    display: flex !important;
     flex-direction: column;
     font-size: 14px;
     color: #333;
@@ -446,7 +446,7 @@
     border-radius: 4px;
     cursor: pointer;
     font-size: 12px;
-    margin-top: 5px;
+    margin: 5px;
 }
 .waifu-btn:hover { background: #2980b9; }
 .waifu-btn.secondary { background: #95a5a6; }
@@ -527,4 +527,13 @@
 /* 第一个标题不加 margin-top */
 .tab-pane > .setting-section-title:first-child {
     margin-top: 0;
+}
+
+/* 让注入容器填满剩余空间，并成为一个新的 Flex 容器 */
+#settings-inject-point {
+    flex: 1;                 /* 占据 Header 之外的所有空间 */
+    display: flex;           /* 再次启用 Flex */
+    flex-direction: column;  /* 垂直排列 (Tabs 在上, Content 在下) */
+    overflow: hidden;        /* 关键：限制自身大小，防止被子元素撑开 */
+    min-height: 0;           /* Firefox/Flexbox 的一个常见修复 */
 }

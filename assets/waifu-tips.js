@@ -16,7 +16,8 @@
     　　　　　　 !'〈//｀Ｔ´', ＼ ｀'7'ｰr'          Live2d Cubism SDK WebGL 2.1 Projrct & All model authors.
     　　　　　　 ﾚ'ヽL__|___i,___,ンﾚ|ノ
     　　　　　 　　　ﾄ-,/　|___./
-    　　　　　 　　　'ｰ'　　!_,.:*********************************************************************************/
+    　　　　　 　　　'ｰ'　　!_,.:
+*/
 
 // ==========================================
 //       1. 全局配置默认值定义 (统一入口)
@@ -97,6 +98,7 @@ const default_settings = {
     useThinkingWaifu:   false,          // 闲聊是否使用思考模型
     useThinkingChat:    true,           // 聊天助手是否使用思考模型
     useThinkingRoast:   false,          // 吐槽是否使用思考模型
+    waifuPrompt: '你是一个网页看板娘，请用简短、可爱的语气回答，不要超过50个字。',
     
     // Peek 设置
     targetType: 'fullscreen',
@@ -179,8 +181,8 @@ $.getJSON(live2d_settings.staticAPIFile, function(result){
 });
 
 function localAPI(action, modelID, texturesID=0){
-    modelID = modelID>0 ? modelID-1 : 0;
-    texturesID = texturesID>0 ? texturesID-1 : 0;
+    // modelID = modelID > 0 ? modelID-1 : 0;
+    // texturesID = texturesID > 0 ? texturesID-1 : 0;
     if(action === 'get'){
         live2d_settings.nowModelID = modelID;
         live2d_settings.nowTexturesID = texturesID;
@@ -536,6 +538,13 @@ function initModel(waifuPath, type) {
             saveGlobalSettings();
         }
     });
+    $('#btn-reset-waifu').click(function(){ 
+        if(confirm('重置看板娘提示词？')) { 
+            $('#prompt-waifu').val(defaultSettings.waifuPrompt); 
+            live2d_settings.waifuPrompt = defaultSettings.waifuPrompt;
+            saveGlobalSettings();
+        }
+    });
     // 刷新窗口列表
     $('#btn-refresh-windows').click(async function() {
         var $btn = $(this);
@@ -624,7 +633,8 @@ function initModel(waifuPath, type) {
         console.log("记忆开关:", live2d_settings.useMemory, "| 记忆轮数:", live2d_settings.memoryLimit);
 
         var messages = [];
-        var systemPrompt = {"role": "system", "content": "你是一个网页看板娘，请用简短、可爱的语气回答，不要超过50个字。"};
+        var systemContent = live2d_settings.waifuPrompt || "你是一个网页看板娘，请用简短、可爱的语气回答，不要超过50个字。";
+        var systemPrompt = {"role": "system", "content": systemContent};
         var history = [];
 
         if (live2d_settings.useMemory) {
@@ -801,7 +811,9 @@ function loadTipsMessage(result) {
         if((after.split('/')[0] <= now.getMonth()+1 && now.getMonth()+1 <= before.split('/')[0]) && 
            (after.split('/')[1] <= now.getDate() && now.getDate() <= before.split('/')[1])){
             var text = getRandText(tips.text);
-            text = text.render({year: now.getFullYear()});
+            var cnYears = now.getFullYear() - 1949; 
+            text = text.render({year: now.getFullYear(), cn_years: cnYears});
+            showMessage(text, 6000, true);
             showMessage(text, 6000, true);
         }
     });
@@ -844,16 +856,16 @@ function loadTipsMessage(result) {
     
     window.showWelcomeMessage = function(result) {
         var text;
-        if (window.location.href == live2d_settings.homePageUrl) {
+        if (1) { // TODO window.location.href == live2d_settings.homePageUrl 目前是默认根据小时提示显示，此处应该增加设置？
             var now = (new Date()).getHours();
-            if (now > 23 || now <= 5) text = getRandText(result.waifu.hour_tips.t23-5);
-            else if (now > 5 && now <= 7) text = getRandText(result.waifu.hour_tips.t5-7);
-            else if (now > 7 && now <= 11) text = getRandText(result.waifu.hour_tips.t7-11);
-            else if (now > 11 && now <= 14) text = getRandText(result.waifu.hour_tips.t11-14);
-            else if (now > 14 && now <= 17) text = getRandText(result.waifu.hour_tips.t14-17);
-            else if (now > 17 && now <= 19) text = getRandText(result.waifu.hour_tips.t17-19);
-            else if (now > 19 && now <= 21) text = getRandText(result.waifu.hour_tips.t19-21);
-            else if (now > 21 && now <= 23) text = getRandText(result.waifu.hour_tips.t21-23);
+            if (now > 23 || now <= 5) text = getRandText(result.waifu.hour_tips['t23-5']);
+            else if (now > 5 && now <= 7) text = getRandText(result.waifu.hour_tips['t5-7']);
+            else if (now > 7 && now <= 11) text = getRandText(result.waifu.hour_tips['t7-11']);
+            else if (now > 11 && now <= 14) text = getRandText(result.waifu.hour_tips['t11-14']);
+            else if (now > 14 && now <= 17) text = getRandText(result.waifu.hour_tips['t14-17']);
+            else if (now > 17 && now <= 19) text = getRandText(result.waifu.hour_tips['t17-19']);
+            else if (now > 19 && now <= 21) text = getRandText(result.waifu.hour_tips['t19-21']);
+            else if (now > 21 && now <= 23) text = getRandText(result.waifu.hour_tips['t21-23']);
             else text = getRandText(result.waifu.hour_tips.default);
         } else {
             var referrer_message = result.waifu.referrer_message;

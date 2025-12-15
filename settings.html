@@ -154,16 +154,17 @@
             align-items: center;
             justify-content: center;
             height: 24px;
-            padding: 0 8px;
-            font-size: 12px;
+            padding: 0 8px !important;
+            font-size: 12px !important;
             border-radius: 3px;
             border: 1px solid #dcdfe6;
             background: #fff;
-            color: #606266;
+            color: #606266 !important;
             cursor: pointer;
             transition: all 0.2s;
             text-decoration: none;
             line-height: 1;
+            margin: 5px;
         }
         .waifu-btn.secondary:hover {
             color: #409eff;
@@ -241,247 +242,27 @@
         <div class="settings-header">
             <span>🔧 看板娘设置中心</span>
         </div>
-        
-        <!-- 顶部 Tab 导航 -->
-        <div class="settings-tabs">
-            <div class="settings-tab-item active" data-tab="general">常规设置</div>
-            <div class="settings-tab-item" data-tab="style">外观样式</div>
-            <div class="settings-tab-item" data-tab="toolbar">工具栏</div>
-            <div class="settings-tab-item" data-tab="llm">LLM & AI</div>
-        </div>
-
-        <div class="settings-content">
-            
-            <!-- Tab 1: 常规设置 -->
-            <div id="tab-general" class="tab-pane active">
-                <div class="setting-section-title">后端与API</div>
-                <div class="setting-group">
-                    <label class="setting-label">一言 API 源</label>
-                    <select data-key="hitokotoAPI" class="waifu-select config-item">
-                        <option value="hitokoto.cn">hitokoto.cn (默认)</option>
-                        <option value="lwl12.com">lwl12.com</option>
-                        <option value="jinrishici.com">jinrishici.com (古诗词)</option>
-                        <option value="fghrsh.net">fghrsh.net</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">Tips JSON 路径</label>
-                    <input data-key="tipsMessage" class="waifu-select config-item" type="text">
-                </div>
-
-                <div class="setting-section-title">交互与提示消息</div>
-                <!-- Checkbox 组 -->
-                <div class="checkbox-group">
-                    <label><input data-key="showHitokoto" class="config-item" type="checkbox"> 显示一言 (空闲时)</label>
-                    <label><input data-key="showWelcomeMessage" class="config-item" type="checkbox"> 显示欢迎词</label>
-                    <label><input data-key="showCopyMessage" class="config-item" type="checkbox"> 显示复制提示</label>
-                    <label><input data-key="showF12Status" class="config-item" type="checkbox"> F12 显示加载状态</label>
-                    <label><input data-key="showF12Message" class="config-item" type="checkbox"> F12 显示看板娘消息</label>
-                    <label><input data-key="showF12OpenMsg" class="config-item" type="checkbox"> F12 显示打开提示</label>
-                </div>
-
-                <div class="setting-section-title">模型切换偏好</div>
-                <div class="checkbox-group">
-                    <label><input data-key="modelStorage" class="config-item" type="checkbox"> 记录模型ID (刷新恢复)</label>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">模型切换模式</label>
-                    <select data-key="modelRandMode" class="waifu-select config-item">
-                        <option value="switch">顺序切换</option>
-                        <option value="rand">随机切换</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">材质切换模式</label>
-                    <select data-key="modelTexturesRandMode" class="waifu-select config-item">
-                        <option value="rand">随机切换</option>
-                        <option value="switch">顺序切换</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Tab 2: 样式设置 -->
-            <div id="tab-style" class="tab-pane">
-                <div class="setting-section-title">尺寸与位置</div>
-                <div class="setting-group">
-                    <label class="setting-label">看板娘大小 (宽x高)</label>
-                    <input data-key="waifuSize" class="waifu-select config-item" type="text" placeholder="280x250">
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">提示框大小 (宽x高)</label>
-                    <input data-key="waifuTipsSize" class="waifu-select config-item" type="text" placeholder="250x75">
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">字体大小</label>
-                    <input data-key="waifuFontSize" class="waifu-select config-item" type="text" placeholder="12px">
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">贴边设置 (left:0 / right:30)</label>
-                    <input data-key="waifuEdgeSide" class="waifu-select config-item" type="text">
-                </div>
-                
-                <div class="setting-section-title">交互行为</div>
-                <div class="setting-group">
-                    <label class="setting-label">拖拽设置</label>
-                    <select data-key="waifuDraggable" class="waifu-select config-item">
-                        <option value="disable">禁用拖拽</option>
-                        <option value="axis-x">水平拖拽</option>
-                        <option value="unlimited">自由拖拽</option>
-                    </select>
-                </div>
-                <div class="checkbox-group">
-                    <label><input data-key="waifuDraggableRevert" class="config-item" type="checkbox"> 松开鼠标还原位置</label>
-                </div>
-
-                <div class="setting-section-title">工具栏微调</div>
-                <div class="setting-group">
-                    <label class="setting-label">工具栏字体大小</label>
-                    <input data-key="waifuToolFont" class="waifu-select config-item" type="text" placeholder="14px">
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">工具栏行高</label>
-                    <input data-key="waifuToolLine" class="waifu-select config-item" type="text" placeholder="20px">
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">工具栏顶部偏移</label>
-                    <input data-key="waifuToolTop" class="waifu-select config-item" type="text" placeholder="-20px">
-                </div>
-            </div>
-
-            <!-- Tab 3: 工具栏设置 -->
-            <div id="tab-toolbar" class="tab-pane">
-                <div class="setting-section-title">按钮显示开关</div>
-                <div class="checkbox-group">
-                    <label><input data-key="showToolMenu" class="config-item" type="checkbox"> <b>显示整个工具栏</b></label>
-                    <hr>
-                    <label><input data-key="canTurnToHomePage" class="config-item" type="checkbox"> 返回首页 (房子)</label>
-                    <label><input data-key="canSwitchHitokoto" class="config-item" type="checkbox"> 一言切换 (气泡)</label>
-                    <label><input data-key="canSwitchModel" class="config-item" type="checkbox"> 模型切换 (眼睛)</label>
-                    <label><input data-key="canSwitchTextures" class="config-item" type="checkbox"> 材质切换 (衣服)</label>
-                    <label><input data-key="canTakeScreenshot" class="config-item" type="checkbox"> 看板娘截图 (相机)</label>
-                    <label><input data-key="canTurnToAboutPage" class="config-item" type="checkbox"> 关于页 (信息)</label>
-                    <label><input data-key="canCloseLive2d" class="config-item" type="checkbox"> 关闭看板娘 (叉号)</label>
-                    <hr>
-                    <label style="color:#409eff; font-weight:bold;"><input data-key="showLLM" class="config-item" type="checkbox"> LLM 对话 (星星)</label>
-                    <label style="color:#409eff; font-weight:bold;"><input data-key="showPeek" class="config-item" type="checkbox"> Peek 屏幕观察 (录像机)</label>
-                    <label style="color:#409eff; font-weight:bold;"><input data-key="showSettings" class="config-item" type="checkbox"> 设置面板 (齿轮)</label>
-                </div>
-            </div>
-
-            <!-- Tab 4: LLM 设置 -->
-            <!-- 关键修改：添加 config-item 类 和 data-key 属性 -->
-            <div id="tab-llm" class="tab-pane">
-                <div class="setting-section-title">核心接口配置</div>
-                <div class="setting-group">
-                    <label class="setting-label">LLM API 地址</label>
-                    <input data-key="llmApiUrl" class="waifu-select config-item" type="text" placeholder="http://127.0.0.1:11434/v1/chat/completions">
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">API Key</label>
-                    <input data-key="llmApiKey" class="waifu-select config-item" type="password" placeholder="Ollama可留空">
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">Python 后端地址</label>
-                    <input data-key="pythonServerUrl" class="waifu-select config-item" type="text" placeholder="http://127.0.0.1:11542/">
-                </div>
-
-                <div class="setting-section-title">模型选择</div>
-                <div class="setting-group">
-                    <label class="setting-label">
-                        普通模型 
-                        <button id="btn-refresh-models" class="waifu-btn secondary">刷新列表</button>
-                    </label>
-                    <select id="model-normal" data-key="modelNormal" class="waifu-select config-item">
-                        <option value="">点击按钮刷新...</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">思考模型</label>
-                    <select id="model-thinking" data-key="modelThinking" class="waifu-select config-item">
-                        <option value="">点击按钮刷新...</option>
-                    </select>
-                </div>
-
-                <div class="setting-section-title">功能开关</div>
-                <div class="checkbox-group">
-                    <label><input id="use-thinking-waifu" data-key="useThinkingWaifu" class="config-item" type="checkbox"> 看板娘对话使用思考模型</label>
-                    <label><input id="use-thinking-chat" data-key="useThinkingChat" class="config-item" type="checkbox"> 聊天助手使用思考模型</label>
-                    <label><input id="use-thinking-roast" data-key="useThinkingRoast" class="config-item" type="checkbox"> 屏幕吐槽使用思考模型</label>
-                </div>
-
-                <div class="setting-section-title">对话记忆</div>
-                <div class="setting-group checkbox-group">
-                    <label><input id="use-memory" data-key="useMemory" class="config-item" type="checkbox"> 多轮对话记忆</label>
-                    <span style="font-size:12px;color:#999;">看板娘会记得你说过的话 (刷新网页依然有效)</span>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">记忆轮数限制 (1轮=一问一答)</label>
-                    <div style="display:flex; gap:10px;">
-                        <input id="memory-limit" data-key="memoryLimit" class="waifu-select config-item" type="number" placeholder="10" style="width:80px; flex:none;">
-                        <button id="btn-clear-memory" class="waifu-btn secondary">清除记忆</button>
-                    </div>
-                </div>
-                
-                <div class="setting-section-title">定时设置</div>
-                <div class="setting-group">
-                    <label class="setting-label">自动吐槽间隔 (ms)</label>
-                    <input data-key="roastInterval" class="waifu-select config-item" type="number" placeholder="60000">
-                </div>
-                <div class="checkbox-group">
-                    <label><input data-key="autoRoast" class="config-item" type="checkbox"> 开启自动定时吐槽</label>
-                </div>
-
-                <div class="setting-section-title">Peek (屏幕观察) 参数</div>
-                <div class="setting-group">
-                    <label class="setting-label">功能模式</label>
-                    <select id="peek-mode" data-key="peekMode" class="waifu-select config-item">
-                        <option value="roast">屏幕吐槽 (Roast)</option>
-                        <option value="chat">聊天助手 (Chat Helper)</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">截图范围</label>
-                    <select id="peek-target-type" data-key="targetType" class="waifu-select config-item">
-                        <option value="fullscreen">全屏截图</option>
-                        <option value="window">指定窗口</option>
-                    </select>
-                </div>
-                <div class="setting-group" id="group-window-select" style="display:none;">
-                    <label class="setting-label">
-                        目标窗口
-                        <button id="btn-refresh-windows" class="waifu-btn secondary">刷新</button>
-                    </label>
-                    <select id="peek-window-list" data-key="targetHwid" class="waifu-select config-item">
-                        <option value="0">请点击刷新...</option>
-                    </select>
-                </div>
-
-                <div class="prompt-group" id="group-prompt-roast">
-                    <label class="setting-label">
-                        <span>吐槽提示词</span>
-                        <button id="btn-reset-roast" class="waifu-btn secondary">重置默认</button>
-                    </label>
-                    <textarea id="prompt-roast" data-key="roastPrompt" class="waifu-textarea config-item"></textarea>
-                </div>
-                <div class="prompt-group" id="group-prompt-chat" style="display:none;">
-                    <label class="setting-label">
-                        <span>助手提示词</span>
-                        <button id="btn-reset-chat" class="waifu-btn secondary">重置默认</button>
-                    </label>
-                    <textarea id="prompt-chat" data-key="chatPrompt" class="waifu-textarea config-item"></textarea>
-                </div>
-            </div>
-        </div>
-
-        <div class="footer-tip">
-            设置已自动保存。刷新主页面或重新打开看板娘即可生效。
+        <div id="settings-inject-container" style="height: 95%; display:flex; flex-direction:column">
+            <!-- 加载中提示 -->
+            <div style="padding:20px; text-align:center;">正在加载设置面板...</div>
         </div>
     </div>
 
     <!-- 逻辑代码已更新为统一配置模式 -->
     <script>
         $(document).ready(function() {
-            
+
+            $("#settings-inject-container").load("settings-content.html", function(response, status, xhr) {
+                if (status == "error") {
+                    $("#settings-inject-container").html("加载设置文件失败: " + xhr.status + " " + xhr.statusText);
+                    return;
+                }
+                
+                initSettingsLogic();
+            });
+        });
+
+        function initSettingsLogic() {
             // --- 1. Tab 切换逻辑 ---
             $('.settings-tab-item').click(function() {
                 $('.settings-tab-item').removeClass('active');
@@ -519,6 +300,7 @@
                 'targetType': 'fullscreen',
                 'useMemory': true,
                 'memoryLimit': 10,
+                'waifuPrompt': '你是一个网页看板娘，请用简短、可爱的语气回答，不要超过50个字。',
                 'roastPrompt': `你是一个住在用户电脑桌面上的可爱看板娘。这是用户当前的屏幕截图。\n
 用户当前正在操作的窗口是：'/window_title'。\n
 背景里挂着的窗口还有：/window_list。\n\n
@@ -671,6 +453,9 @@
             $('#btn-reset-chat').click(function(){ 
                 $('#prompt-chat').val(defaultSettings.chatPrompt); saveSettings(); 
             });
+            $('#btn-reset-waifu').click(function(){ 
+                $('#prompt-waifu').val(defaultSettings.waifuPrompt); saveSettings(); 
+            });
 
             // --- 7. 初始化执行 ---
             
@@ -684,7 +469,7 @@
                     $('#btn-refresh-windows').click(); 
                 }
             }, 100);
-        });
+        }
     </script>
 </body>
 </html>
