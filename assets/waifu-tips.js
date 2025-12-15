@@ -247,6 +247,9 @@ function hideMessage(timeout) {
 }
 
 function initModel(waifuPath, type) {
+    // ==========================================
+    //       新增：全局设置面板绑定逻辑
+    // ==========================================
     $(document).ready(function() {
         // 初始化设置面板
         initSettingsPanel();
@@ -270,9 +273,6 @@ function initModel(waifuPath, type) {
             }
         });
     });
-    // ==========================================
-    //       新增：全局设置面板绑定逻辑
-    // ==========================================
     function initSettingsPanel() {
         // 1. Tab 选项卡切换逻辑
         $('.settings-tab-item').click(function() {
@@ -797,9 +797,14 @@ function loadTipsMessage(result) {
         $(this).text('刷新中...');
         fetchModelList($(this));
     });
+    // 重置提示词
+    $('#btn-reset-roast').click(function() {
+        if(confirm('重置吐槽提示词？')) { $('#prompt-roast').val(defaultSettings.roastPrompt); saveAllSettings(); }
+    });
+    $('#btn-reset-chat').click(function() {
+        if(confirm('重置助手提示词？')) { $('#prompt-chat').val(defaultSettings.chatPrompt); saveAllSettings(); }
+    });
     // 刷新窗口列表
-
-
     $('#btn-refresh-windows').click(async function() {
         var $btn = $(this);
         $btn.text('...');
@@ -830,13 +835,7 @@ function loadTipsMessage(result) {
         }
     }, 100);
     
-    // 重置提示词
-    $('#btn-reset-roast').click(function() {
-        if(confirm('重置吐槽提示词？')) { $('#prompt-roast').val(defaultSettings.roastPrompt); saveAllSettings(); }
-    });
-    $('#btn-reset-chat').click(function() {
-        if(confirm('重置助手提示词？')) { $('#prompt-chat').val(defaultSettings.chatPrompt); saveAllSettings(); }
-    });
+    
     // 获取模型列表
     async function fetchModelList(btn) {
         try {
