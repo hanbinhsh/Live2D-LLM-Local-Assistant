@@ -179,8 +179,8 @@ $.getJSON(live2d_settings.staticAPIFile, function(result){
 });
 
 function localAPI(action, modelID, texturesID=0){
-    //modelID = modelID>0 ? modelID-1 : 0;
-    //texturesID = texturesID>0 ? texturesID-1 : 0;
+    modelID = modelID>0 ? modelID-1 : 0;
+    texturesID = texturesID>0 ? texturesID-1 : 0;
     if(action === 'get'){
         live2d_settings.nowModelID = modelID;
         live2d_settings.nowTexturesID = texturesID;
