@@ -165,7 +165,6 @@
                 </div>
             </div>
 
-            <!-- Tab 4: LLM 设置 -->
             <div id="tab-llm" class="tab-pane" style="display:none;">
                 <div class="setting-section-title">核心接口配置</div>
                 <div class="setting-group">
@@ -187,33 +186,33 @@
                         普通模型 (响应快)
                         <button id="btn-refresh-models" class="waifu-btn secondary" style="padding:1px 5px;font-size:10px;float:right;">刷新列表</button>
                     </label>
-                    <select id="model-normal" class="waifu-select">
+                    <select id="model-normal" data-key="modelNormal" class="waifu-select config-item">
                         <option value="">点击刷新...</option>
                     </select>
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">思考模型 (能力强)</label>
-                    <select id="model-thinking" class="waifu-select">
+                    <select id="model-thinking" data-key="modelThinking" class="waifu-select config-item">
                         <option value="">点击刷新...</option>
                     </select>
                 </div>
 
                 <div class="setting-section-title" style="margin-top:15px;">功能开关</div>
                 <div class="setting-group checkbox-group">
-                    <label><input id="use-thinking-waifu" type="checkbox"> 看板娘对话使用思考模型</label>
-                    <label><input id="use-thinking-chat" type="checkbox"> 聊天助手使用思考模型</label>
-                    <label><input id="use-thinking-roast" type="checkbox"> 屏幕吐槽使用思考模型</label>
+                    <label><input id="use-thinking-waifu" data-key="useThinkingWaifu" class="config-item" type="checkbox"> 看板娘对话使用思考模型</label>
+                    <label><input id="use-thinking-chat" data-key="useThinkingChat" class="config-item" type="checkbox"> 聊天助手使用思考模型</label>
+                    <label><input id="use-thinking-roast" data-key="useThinkingRoast" class="config-item" type="checkbox"> 屏幕吐槽使用思考模型</label>
                 </div>
 
                 <div class="setting-section-title">对话记忆</div>
                 <div class="setting-group checkbox-group">
-                    <label><input id="use-memory" class="llm-item" type="checkbox"> 多轮对话记忆</label>
+                    <label><input id="use-memory" data-key="useMemory" class="llm-item config-item" type="checkbox"> 多轮对话记忆</label>
                     <span style="font-size:12px;color:#999;">看板娘会记得你说过的话 (刷新网页依然有效)</span>
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">记忆轮数限制 (1轮=一问一答)</label>
                     <div style="display:flex; gap:10px;">
-                        <input id="memory-limit" class="waifu-select llm-item" type="number" placeholder="10" style="width:80px; flex:none;">
+                        <input id="memory-limit" data-key="memoryLimit" class="waifu-select llm-item config-item" type="number" placeholder="10" style="width:80px; flex:none;">
                         <button id="btn-clear-memory" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">清除记忆</button>
                     </div>
                 </div>
@@ -232,14 +231,14 @@
                 <div class="setting-section-title">Peek 详细参数</div>
                 <div class="setting-group">
                     <label class="setting-label">功能模式</label>
-                    <select id="peek-mode" class="waifu-select">
+                    <select id="peek-mode" data-key="peekMode" class="waifu-select config-item">
                         <option value="roast">屏幕吐槽 (Roast)</option>
                         <option value="chat">聊天助手 (Chat Helper)</option>
                     </select>
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">截图范围</label>
-                    <select id="peek-target-type" class="waifu-select">
+                    <select id="peek-target-type" data-key="targetType" class="waifu-select config-item">
                         <option value="fullscreen">全屏截图</option>
                         <option value="window">指定窗口</option>
                     </select>
@@ -249,7 +248,7 @@
                         选择窗口 
                         <button id="btn-refresh-windows" class="waifu-btn secondary" style="padding:2px 5px; font-size:10px;">刷新</button>
                     </label>
-                    <select id="peek-window-list" class="waifu-select">
+                    <select id="peek-window-list" data-key="targetHwid" class="waifu-select config-item">
                         <option value="0">请点击刷新...</option>
                     </select>
                 </div>
@@ -259,14 +258,14 @@
                         吐槽提示词 
                         <button id="btn-reset-roast" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">重置</button>
                     </label>
-                    <textarea id="prompt-roast" class="waifu-textarea"></textarea>
+                    <textarea id="prompt-roast" data-key="roastPrompt" class="waifu-textarea config-item"></textarea>
                 </div>
                 <div class="setting-group prompt-group" id="group-prompt-chat" style="display:none;margin-top:10px;">
                     <label class="setting-label">
                         助手提示词
                         <button id="btn-reset-chat" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">重置</button>
                     </label>
-                    <textarea id="prompt-chat" class="waifu-textarea"></textarea>
+                    <textarea id="prompt-chat" data-key="chatPrompt" class="waifu-textarea config-item"></textarea>
                 </div>
             </div>
 

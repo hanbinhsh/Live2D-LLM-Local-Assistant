@@ -369,55 +369,55 @@
             </div>
 
             <!-- Tab 4: LLM 设置 -->
+            <!-- 关键修改：添加 config-item 类 和 data-key 属性 -->
             <div id="tab-llm" class="tab-pane">
                 <div class="setting-section-title">核心接口配置</div>
                 <div class="setting-group">
                     <label class="setting-label">LLM API 地址</label>
-                    <input data-key="llmApiUrl" class="waifu-select config-item llm-item" type="text" placeholder="http://127.0.0.1:11434/v1/chat/completions">
+                    <input data-key="llmApiUrl" class="waifu-select config-item" type="text" placeholder="http://127.0.0.1:11434/v1/chat/completions">
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">API Key</label>
-                    <input data-key="llmApiKey" class="waifu-select config-item llm-item" type="password" placeholder="Ollama可留空">
+                    <input data-key="llmApiKey" class="waifu-select config-item" type="password" placeholder="Ollama可留空">
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">Python 后端地址</label>
-                    <input data-key="pythonServerUrl" class="waifu-select config-item llm-item" type="text" placeholder="http://127.0.0.1:11542/">
+                    <input data-key="pythonServerUrl" class="waifu-select config-item" type="text" placeholder="http://127.0.0.1:11542/">
                 </div>
 
                 <div class="setting-section-title">模型选择</div>
                 <div class="setting-group">
-                    <!-- 优化：Label 包含按钮，通过 Flexbox 对齐 -->
                     <label class="setting-label">
                         普通模型 
                         <button id="btn-refresh-models" class="waifu-btn secondary">刷新列表</button>
                     </label>
-                    <select id="model-normal" class="waifu-select llm-item">
+                    <select id="model-normal" data-key="modelNormal" class="waifu-select config-item">
                         <option value="">点击按钮刷新...</option>
                     </select>
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">思考模型</label>
-                    <select id="model-thinking" class="waifu-select llm-item">
+                    <select id="model-thinking" data-key="modelThinking" class="waifu-select config-item">
                         <option value="">点击按钮刷新...</option>
                     </select>
                 </div>
 
                 <div class="setting-section-title">功能开关</div>
                 <div class="checkbox-group">
-                    <label><input id="use-thinking-waifu" class="llm-item" type="checkbox"> 看板娘对话使用思考模型</label>
-                    <label><input id="use-thinking-chat" class="llm-item" type="checkbox"> 聊天助手使用思考模型</label>
-                    <label><input id="use-thinking-roast" class="llm-item" type="checkbox"> 屏幕吐槽使用思考模型</label>
+                    <label><input id="use-thinking-waifu" data-key="useThinkingWaifu" class="config-item" type="checkbox"> 看板娘对话使用思考模型</label>
+                    <label><input id="use-thinking-chat" data-key="useThinkingChat" class="config-item" type="checkbox"> 聊天助手使用思考模型</label>
+                    <label><input id="use-thinking-roast" data-key="useThinkingRoast" class="config-item" type="checkbox"> 屏幕吐槽使用思考模型</label>
                 </div>
 
                 <div class="setting-section-title">对话记忆</div>
                 <div class="setting-group checkbox-group">
-                    <label><input id="use-memory" class="llm-item" type="checkbox"> 多轮对话记忆</label>
+                    <label><input id="use-memory" data-key="useMemory" class="config-item" type="checkbox"> 多轮对话记忆</label>
                     <span style="font-size:12px;color:#999;">看板娘会记得你说过的话 (刷新网页依然有效)</span>
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">记忆轮数限制 (1轮=一问一答)</label>
                     <div style="display:flex; gap:10px;">
-                        <input id="memory-limit" class="waifu-select llm-item" type="number" placeholder="10" style="width:80px; flex:none;">
+                        <input id="memory-limit" data-key="memoryLimit" class="waifu-select config-item" type="number" placeholder="10" style="width:80px; flex:none;">
                         <button id="btn-clear-memory" class="waifu-btn secondary">清除记忆</button>
                     </div>
                 </div>
@@ -425,23 +425,23 @@
                 <div class="setting-section-title">定时设置</div>
                 <div class="setting-group">
                     <label class="setting-label">自动吐槽间隔 (ms)</label>
-                    <input data-key="roastInterval" class="waifu-select config-item llm-item" type="number" placeholder="60000">
+                    <input data-key="roastInterval" class="waifu-select config-item" type="number" placeholder="60000">
                 </div>
                 <div class="checkbox-group">
-                    <label><input data-key="autoRoast" class="config-item llm-item" type="checkbox"> 开启自动定时吐槽</label>
+                    <label><input data-key="autoRoast" class="config-item" type="checkbox"> 开启自动定时吐槽</label>
                 </div>
 
                 <div class="setting-section-title">Peek (屏幕观察) 参数</div>
                 <div class="setting-group">
                     <label class="setting-label">功能模式</label>
-                    <select id="peek-mode" class="waifu-select llm-item">
+                    <select id="peek-mode" data-key="peekMode" class="waifu-select config-item">
                         <option value="roast">屏幕吐槽 (Roast)</option>
                         <option value="chat">聊天助手 (Chat Helper)</option>
                     </select>
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">截图范围</label>
-                    <select id="peek-target-type" class="waifu-select llm-item">
+                    <select id="peek-target-type" data-key="targetType" class="waifu-select config-item">
                         <option value="fullscreen">全屏截图</option>
                         <option value="window">指定窗口</option>
                     </select>
@@ -451,25 +451,24 @@
                         目标窗口
                         <button id="btn-refresh-windows" class="waifu-btn secondary">刷新</button>
                     </label>
-                    <select id="peek-window-list" class="waifu-select llm-item">
+                    <select id="peek-window-list" data-key="targetHwid" class="waifu-select config-item">
                         <option value="0">请点击刷新...</option>
                     </select>
                 </div>
 
-                <!-- 提示词输入框优化：Flex 布局标题栏 -->
                 <div class="prompt-group" id="group-prompt-roast">
                     <label class="setting-label">
                         <span>吐槽提示词</span>
                         <button id="btn-reset-roast" class="waifu-btn secondary">重置默认</button>
                     </label>
-                    <textarea id="prompt-roast" class="waifu-textarea llm-item"></textarea>
+                    <textarea id="prompt-roast" data-key="roastPrompt" class="waifu-textarea config-item"></textarea>
                 </div>
                 <div class="prompt-group" id="group-prompt-chat" style="display:none;">
                     <label class="setting-label">
                         <span>助手提示词</span>
                         <button id="btn-reset-chat" class="waifu-btn secondary">重置默认</button>
                     </label>
-                    <textarea id="prompt-chat" class="waifu-textarea llm-item"></textarea>
+                    <textarea id="prompt-chat" data-key="chatPrompt" class="waifu-textarea config-item"></textarea>
                 </div>
             </div>
         </div>
@@ -479,7 +478,7 @@
         </div>
     </div>
 
-    <!-- 逻辑代码保持完全原样，未做任何修改 -->
+    <!-- 逻辑代码已更新为统一配置模式 -->
     <script>
         $(document).ready(function() {
             
@@ -491,8 +490,10 @@
                 $('#tab-' + $(this).data('tab')).show();
             });
 
-            // --- 2. 定义默认配置 (与 live2d.js 保持一致，防止读取空值报错) ---
-            var defaultGlobal = {
+            // --- 2. 定义默认配置 (包含 Global 和 LLM 的所有默认值) ---
+            // 确保这些 Key 与 JS 文件中的 default_settings 一致
+            var defaultSettings = {
+                // 常规
                 'waifuSize': '280x250',
                 'waifuTipsSize': '250x75',
                 'waifuFontSize': '12px',
@@ -509,16 +510,16 @@
                 'showLLM': true,
                 'showPeek': true,
                 'showSettings': true,
-                // ... 其他默认值可按需补充
-            };
-
-            var defaultLLM = {
+                
+                // LLM & AI
                 'llmApiUrl': 'http://127.0.0.1:11434/v1/chat/completions',
                 'pythonServerUrl': 'http://127.0.0.1:11542/',
                 'roastInterval': 60000,
                 'peekMode': 'roast',
                 'targetType': 'fullscreen',
-                roastPrompt: `你是一个住在用户电脑桌面上的可爱看板娘。这是用户当前的屏幕截图。\n
+                'useMemory': true,
+                'memoryLimit': 10,
+                'roastPrompt': `你是一个住在用户电脑桌面上的可爱看板娘。这是用户当前的屏幕截图。\n
 用户当前正在操作的窗口是：'/window_title'。\n
 背景里挂着的窗口还有：/window_list。\n\n
 请根据屏幕内容和窗口判断用户正在做什么，并以**女朋友或贴心助手**的口吻直接对用户说话（使用第二人称‘你’）。\n
@@ -527,26 +528,21 @@
 2. 这是一个猜测互动的过程。\n
 3. 语气要软萌、可爱、充满元气。\n
 4. 字数控制在50字以内。`,
-                chatPrompt: `你是一个智能聊天助手。当前窗口是 '/window_title'。\n
+                'chatPrompt': `你是一个智能聊天助手。当前窗口是 '/window_title'。\n
 请阅读图片中的聊天记录或文本内容，结合上下文，生成一个合适的、高情商的回复。\n
 请直接给出你此刻会发送的那一句话，你的回复应像真人在即时聊天中自然打出的内容，不要包含解释。`
             };
 
-            // --- 3. 读取并填充设置 ---
+            // --- 3. 读取并填充设置 (统一逻辑) ---
             function loadSettings() {
-                // 读取 Global
-                var savedGlobal = localStorage.getItem('waifu_global_settings');
-                var configGlobal = $.extend({}, defaultGlobal, savedGlobal ? JSON.parse(savedGlobal) : {});
+                // 只读取 waifu_global_settings
+                var saved = localStorage.getItem('waifu_global_settings');
+                var config = $.extend({}, defaultSettings, saved ? JSON.parse(saved) : {});
 
-                // 读取 LLM
-                var savedLLM = localStorage.getItem('waifu_llm_settings');
-                var configLLM = $.extend({}, defaultLLM, savedLLM ? JSON.parse(savedLLM) : {});
-
-                // 填充 .config-item (主要对应 Global)
+                // 遍历所有带有 config-item 类的输入框
                 $('.config-item').each(function() {
                     var key = $(this).data('key');
-                    // 优先从 LLM 中找 (例如 API URL)，如果没有再从 Global 找
-                    var val = configLLM[key] !== undefined ? configLLM[key] : configGlobal[key];
+                    var val = config[key];
                     
                     if (val !== undefined) {
                         if ($(this).attr('type') === 'checkbox') {
@@ -557,63 +553,29 @@
                     }
                 });
 
-                // 填充 LLM 专用控件 (ID 绑定的那些)
-                $('#model-normal').val(configLLM.modelNormal);
-                $('#model-thinking').val(configLLM.modelThinking);
-                $('#use-thinking-waifu').prop('checked', configLLM.useThinkingWaifu);
-                $('#use-thinking-chat').prop('checked', configLLM.useThinkingChat);
-                $('#use-thinking-roast').prop('checked', configLLM.useThinkingRoast);
-                $('#peek-mode').val(configLLM.peekMode || 'roast');
-                $('#peek-target-type').val(configLLM.targetType || 'fullscreen');
-                $('#prompt-roast').val(configLLM.roastPrompt);
-                $('#prompt-chat').val(configLLM.chatPrompt);
-                $('#use-memory').prop('checked', configLLM.useMemory !== false); // 默认开启(如果不为false)
-                $('#memory-limit').val(configLLM.memoryLimit || 10); // 默认10轮
-
-                toggleLLMUI(); // 刷新 UI 显示状态
+                toggleLLMUI(); // 刷新 UI 显示状态 (UI 依赖于填入的值)
             }
 
-            // --- 4. 保存逻辑 ---
+            // --- 4. 保存逻辑 (统一逻辑) ---
             function saveSettings() {
-                // 保存 Global
-                var currentGlobal = localStorage.getItem('waifu_global_settings') ? JSON.parse(localStorage.getItem('waifu_global_settings')) : {};
+                // 读取当前存储 (保留那些不在界面上的设置，如 modelId)
+                var currentConfig = localStorage.getItem('waifu_global_settings') ? JSON.parse(localStorage.getItem('waifu_global_settings')) : {};
                 
+                // 遍历界面上的所有配置项，更新到对象中
                 $('.config-item').each(function() {
                     var key = $(this).data('key');
-                    // 排除掉属于 LLM 的 key (虽然这里混用了 config-item class)
-                    // 简单判断：如果它没有 llm-item 这个类，就存入 Global
-                    if (!$(this).hasClass('llm-item')) {
-                        if ($(this).attr('type') === 'checkbox') currentGlobal[key] = $(this).is(':checked');
-                        else currentGlobal[key] = $(this).val();
+                    if (key) {
+                        if ($(this).attr('type') === 'checkbox') {
+                            currentConfig[key] = $(this).is(':checked');
+                        } else {
+                            currentConfig[key] = $(this).val();
+                        }
                     }
                 });
-                localStorage.setItem('waifu_global_settings', JSON.stringify(currentGlobal));
 
-                // 保存 LLM
-                var currentLLM = localStorage.getItem('waifu_llm_settings') ? JSON.parse(localStorage.getItem('waifu_llm_settings')) : {};
-                
-                // 收集 llm-item 类的 config-item
-                $('.llm-item.config-item').each(function() {
-                    var key = $(this).data('key');
-                    if ($(this).attr('type') === 'checkbox') currentLLM[key] = $(this).is(':checked');
-                    else currentLLM[key] = $(this).val();
-                });
-
-                // 收集 ID 绑定的 LLM 设置
-                currentLLM.modelNormal = $('#model-normal').val();
-                currentLLM.modelThinking = $('#model-thinking').val();
-                currentLLM.useThinkingWaifu = $('#use-thinking-waifu').is(':checked');
-                currentLLM.useThinkingChat = $('#use-thinking-chat').is(':checked');
-                currentLLM.useThinkingRoast = $('#use-thinking-roast').is(':checked');
-                currentLLM.peekMode = $('#peek-mode').val();
-                currentLLM.targetType = $('#peek-target-type').val();
-                currentLLM.targetHwid = $('#peek-window-list').val();
-                currentLLM.roastPrompt = $('#prompt-roast').val();
-                currentLLM.chatPrompt = $('#prompt-chat').val();
-                currentLLM.useMemory = $('#use-memory').is(':checked');
-                currentLLM.memoryLimit = $('#memory-limit').val();
-                
-                localStorage.setItem('waifu_llm_settings', JSON.stringify(currentLLM));
+                // 保存回 LocalStorage
+                // 注意：这里保存后，主窗口的 'storage' 事件监听器会捕捉到并同步
+                localStorage.setItem('waifu_global_settings', JSON.stringify(currentConfig));
             }
 
             // 监听所有输入变化，自动保存
@@ -635,10 +597,9 @@
             }
 
             // --- 6. 远程数据获取 (模型列表与窗口列表) ---
-            // 这里的 fetchUrl 需要从 input 中动态获取，防止用户改了 input 还没保存
             function getPythonUrl() {
                 var url = $('input[data-key="pythonServerUrl"]').val();
-                if (!url) return ''; // 防止空地址报错
+                if (!url) return '';
                 return url.endsWith('/') ? url : url + '/';
             }
 
@@ -646,20 +607,15 @@
                 var $btn = $('#btn-refresh-models');
                 var $selects = $('#model-normal, #model-thinking');
                 
-                // 1. 界面显示“加载中”
                 $btn.text('刷新中...');
-                // 这里的 html() 只是临时占位，防止用户看起来以为坏了
-                // $selects.html('<option>加载中...</option>'); 
 
                 try {
                     var apiUrl = getPythonUrl();
                     if (!apiUrl) throw new Error("API地址为空");
 
-                    // 2. 请求后端
                     const response = await fetch(apiUrl + 'list_models');
                     const data = await response.json();
                     
-                    // 3. 生成 HTML 选项
                     var html = '';
                     if (data.models && data.models.length > 0) {
                         data.models.forEach(m => html += `<option value="${m}">${m}</option>`);
@@ -667,18 +623,17 @@
                         html = '<option value="">未找到模型</option>';
                     }
                     
-                    // 4. 填充下拉框
                     $selects.html(html);
 
-                    // 5. 【关键】列表有了之后，重新从 LocalStorage 恢复选中的值
-                    var savedLLM = JSON.parse(localStorage.getItem('waifu_llm_settings') || '{}');
-                    if (savedLLM.modelNormal) $('#model-normal').val(savedLLM.modelNormal);
-                    if (savedLLM.modelThinking) $('#model-thinking').val(savedLLM.modelThinking);
+                    // 列表刷新后，重新从 LocalStorage 恢复选中的值
+                    // 否则下拉框会重置为第一个选项
+                    var saved = JSON.parse(localStorage.getItem('waifu_global_settings') || '{}');
+                    if (saved.modelNormal) $('#model-normal').val(saved.modelNormal);
+                    if (saved.modelThinking) $('#model-thinking').val(saved.modelThinking);
                     
                 } catch (e) {
-                    console.error(e);
-                    // 如果自动加载失败（比如后端没开），给个友好的提示，保留原来的选项
-                    $selects.html('<option value="">连接失败，请检查后端</option>');
+                    // console.error(e);
+                    // 保持静默或显示友好提示
                 } finally {
                     $btn.text('刷新列表');
                 }
@@ -700,31 +655,29 @@
                     }
                     $('#peek-window-list').html(html);
                     
-                    // 恢复选中的窗口（如果有）
-                    var savedLLM = JSON.parse(localStorage.getItem('waifu_llm_settings') || '{}');
-                    if(savedLLM.targetHwid) $('#peek-window-list').val(savedLLM.targetHwid);
+                    var saved = JSON.parse(localStorage.getItem('waifu_global_settings') || '{}');
+                    if(saved.targetHwid) $('#peek-window-list').val(saved.targetHwid);
                     
                 } catch (e) {
-                    alert('获取窗口失败'); // 自动加载时最好别弹窗
+                    alert('获取窗口失败');
                 }
                 $btn.text('刷新');
             });
             
             // 重置提示词按钮
             $('#btn-reset-roast').click(function(){ 
-                $('#prompt-roast').val(defaultLLM.roastPrompt); saveSettings(); 
+                $('#prompt-roast').val(defaultSettings.roastPrompt); saveSettings(); 
             });
             $('#btn-reset-chat').click(function(){ 
-                $('#prompt-chat').val(defaultLLM.chatPrompt); saveSettings(); 
+                $('#prompt-chat').val(defaultSettings.chatPrompt); saveSettings(); 
             });
 
             // --- 7. 初始化执行 ---
             
-            // 先加载基础文本框设置 (URL, API Key 等)
+            // 加载所有设置
             loadSettings(); 
             
-            // 【关键】页面加载时，自动触发一次模型列表获取
-            // 延时一点点确保 URL 已经填入
+            // 自动尝试加载模型列表
             setTimeout(function() {
                 if ($('input[data-key="pythonServerUrl"]').val()) {
                     fetchModelList();
