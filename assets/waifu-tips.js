@@ -987,6 +987,7 @@ function initModel(waifuPath, type) {
 
                     if (currentImageUrl) {
                         // 存 URL 到历史，节省空间
+                        console.log("保存用户消息时包含图片 URL");
                         storageUserMsg = {
                             "role": "user",
                             "content": [
@@ -1029,9 +1030,9 @@ function initModel(waifuPath, type) {
             llmAbortController = null;
             $('.waifu-tool .fui-pause').hide(); // 隐藏停止按钮
             // TODO 清理图片数据，注释掉让用户不关闭图片时继续使用，加入设置？
-            // currentImageBase64 = null;
-            // currentImageUrl = null;
-            // $('#waifu-preview-close').click(); // 触发 UI 重置
+            currentImageBase64 = null;
+            currentImageUrl = null;
+            $('#waifu-preview-close').click(); // 触发 UI 重置
         }
     }
 
