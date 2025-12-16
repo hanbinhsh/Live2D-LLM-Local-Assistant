@@ -10,6 +10,9 @@ from pydantic import BaseModel
 import requests
 import os
 import pyperclip
+import uuid
+import datetime
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
@@ -26,6 +29,13 @@ app.add_middleware(
 OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 OLLAMA_API = OLLAMA_BASE_URL + "/api/generate"
 TARGET_SIZE = (1280, 720)
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "storage", "image_upload")
+
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
+class ImageUploadRequest(BaseModel):
+    base64_data: str  # 包含 header 的 base64 字符串
 
 # === 请求体定义 ===
 class AnalyzeRequest(BaseModel):
@@ -245,7 +255,39 @@ def see_and_roast(req: AnalyzeRequest):
 
     except Exception as e:
         print(f"Error: {e}")
-        return {"reply": "系统出错了，我看不到屏幕..."}
+        return {"reply": "系统出错了，我看不到屏幕...", "success": False}
+    
+@app.post("/upload_image")
+async def upload_image(req: ImageUploadRequest):
+    try:
+        # 1. 处理 Base64 数据
+        if "," in req.base64_data:
+            header, encoded = req.base64_data.split(",", 1)
+        else:
+            encoded = req.base64_data
+        
+        # 自动识别后缀
+        ext = "jpg"
+        if "image/png" in req.base64_data: ext = "png"
+        elif "image/gif" in req.base64_data: ext = "gif"
+        elif "image/webp" in req.base64_data: ext = "webp"
+
+        # 2. 生成唯一文件名 (时间戳+随机码)
+        filename = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.{ext}"
+        file_path = os.path.join(UPLOAD_DIR, filename)
+
+        # 3. 解码并保存
+        with open(file_path, "wb") as f:
+            f.write(base64.b64decode(encoded))
+
+        # 4. 返回可访问的 URL (指向 Python 服务器端口)
+        # 注意：这里返回的是绝对路径 URL，方便前端直接展示
+        image_url = f"http://127.0.0.1:10452/storage/image_upload/{filename}"
+        
+        return {"success": True, "url": image_url}
+    except Exception as e:
+        print(f"上传失败: {e}")
+        raise HTTPException(status_code=500, detail="图片保存失败")
 
 if __name__ == "__main__":
     import uvicorn

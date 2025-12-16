@@ -25,14 +25,36 @@
             <span class="fui-info-circle"></span>
             <span class="fui-star"></span>
             <span class="fui-video"></span>
+            <span class="fui-mail"></span>
             <span class="fui-gear"></span>
             <span class="fui-cross"></span>
         </div>
         <div class="waifu-chat-box" style="display:none;">
-            <input id="waifu-input" type="text" placeholder="聊点什么？(回车发送)" autocomplete="off">
+            <div id="waifu-img-preview-container" style="display:none;">
+                <img id="waifu-preview-img" src="" alt="preview">
+                <span id="waifu-preview-close">×</span>
+            </div>
+
+            <input type="file" id="waifu-file-input" accept="image/*" style="display:none;">
+            <button id="waifu-upload-btn">
+                <span class="fui-plus"></span>
+            </button>
+
+            <input id="waifu-input" type="text" placeholder="和看板娘聊聊天吧！" autocomplete="off">
+
             <button id="waifu-send-btn">
                 <span class="fui-triangle-right-large"></span>
             </button>
+        </div>
+        <div class="waifu-history-panel">
+            <div class="history-header">
+                <span>与看板娘的回忆</span>
+                <span class="history-close">×</span>
+            </div>
+            <div class="history-content" id="history-list">
+                <!-- JS 会把聊天记录填充到这里 -->
+                <div class="history-empty">暂无对话记录</div>
+            </div>
         </div>
         <div class="waifu-settings-panel">
         <div class="settings-header">

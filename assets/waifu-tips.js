@@ -411,6 +411,7 @@ function initModel(waifuPath, type) {
     }
 
     function applyImmediateChanges(key, val) {
+        toggleUI()
         function toggleBtn($el, show) {
             if (show) $el.css('display', ''); 
             else $el.hide(); 
@@ -435,6 +436,172 @@ function initModel(waifuPath, type) {
                 else $(".waifu").draggable('enable');
             }
         }
+    }
+
+    // --- 图片上传逻辑 ---
+    var currentImageUrl = null;    // 存储服务器上的 URL (用于展示和存入历史)
+    var currentImageBase64 = null; // 存储 Base64 (仅用于发送给 LLM 接口，因为 LLM 通常直接要数据)
+
+    // 点击相机图标 -> 触发文件选择
+    $('#waifu-upload-btn').click(function() {
+        $('#waifu-file-input').click();
+    });
+
+    // 文件选择变动
+    $('#waifu-file-input').change(function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+
+        var reader = new FileReader();
+        reader.onload = async function(evt) {
+            var base64Data = evt.target.result;
+            
+            // --- 上传到 Python 后端 ---
+            try {
+                // 显示“上传中...”的提示
+                showMessage("正在把照片存进相册...", 2000);
+                const response = await fetch(live2d_settings.pythonServerUrl + 'upload_image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ base64_data: base64Data })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    currentImageUrl = data.url;      // 服务器图片地址 (http://127.0.0.1:11542/...)
+                    currentImageBase64 = base64Data; // 保持 Base64 供发送给 LLM
+                    // 显示预览
+                    $('#waifu-preview-img').attr('src', currentImageUrl);
+                    $('#waifu-img-preview-container').show();
+                    $('#waifu-input').focus();
+                } else {
+                    showMessage("哎呀，照片没存好，换一张试试？", 3000);
+                }
+            } catch (err) {
+                console.error("上传图片错误:", err);
+                showMessage("啊哦，图片上传出了点问题，是不是Python后端没启动？。", 3000);
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // 点击删除预览图
+    $('#waifu-preview-close').click(function() {
+        currentImageBase64 = null;
+        $('#waifu-file-input').val(''); // 清空 input，允许再次选择同一张图
+        $('#waifu-img-preview-container').hide();
+    });
+
+    // ==========================================
+    //           历史记录侧边栏逻辑
+    // ==========================================
+
+    // 1. 点击按钮：打开侧边栏并渲染
+    $(document).on('click', '.waifu-tool .fui-mail', function() {
+        // 1. 先触发动画（让面板滑出来）
+        $('.waifu-history-panel').addClass('open');
+        
+        // 2. 同步打开输入框逻辑（保持不变）
+        var chatBox = $('.waifu-chat-box');
+        if (!chatBox.is(':visible')) chatBox.slideDown(200);
+        $('#waifu-input').focus();
+
+        // 3. 【关键优化】将重渲染推迟，给浏览器一点时间处理动画帧
+        // 显示一个临时的加载状态（可选）
+        if($('#history-list').is(':empty')) {
+             $('#history-list').html('<div style="text-align:center;padding:20px;color:#999;">加载中...</div>');
+        }
+
+        requestAnimationFrame(function() {
+            // 再延迟一点点，确保侧边栏已经开始移动
+            setTimeout(function() {
+                renderHistoryPanel();
+            }, 50); 
+        });
+    });
+
+    // 2. 点击关闭按钮：关闭侧边栏
+    $(document).on('click', '.history-close', function() {
+        $('.waifu-history-panel').removeClass('open');
+        $('.waifu-chat-box').slideUp(200);
+    });
+
+    // 3. 点击遮罩层关闭 (如果之后你想加遮罩层的话，这里预留逻辑)
+    // 目前点击面板外部不做处理，或者你可以给 body 加个点击事件来检测
+
+    // 4. 核心渲染函数
+    function renderHistoryPanel() {
+        var $container = $('#history-list');
+        $container.empty(); // 清空旧内容
+
+        // 读取 LocalStorage
+        var historyStr = localStorage.getItem('waifu_chat_history');
+        if (!historyStr || historyStr === '[]') {
+            $container.html('<div class="history-empty">还没有和看板娘说过话哦~<br>快去聊两句吧！</div>');
+            return;
+        }
+
+        var history = [];
+        try {
+            history = JSON.parse(historyStr);
+        } catch (e) {
+            $container.html('<div class="history-empty">记录损坏，无法读取</div>');
+            return;
+        }
+
+        // 遍历并生成 HTML
+        history.forEach(function(msg) {
+            // 跳过 system 提示词，只显示对话
+            if (msg.role === 'system') return;
+
+            var roleClass = msg.role; // 'user' or 'assistant'
+            var roleName = (msg.role === 'user') ? '你' : '看板娘';
+            var html = '';
+
+            // --- 解析消息内容 (兼容纯文本和多模态图片数组) ---
+            var contentHtml = '';
+            
+            if (Array.isArray(msg.content)) {
+                // 如果是数组 (包含图片)
+                msg.content.forEach(function(item) {
+                    if (item.type === 'text') {
+                        contentHtml += `<div>${escapeHtml(item.text)}</div>`;
+                    } else if (item.type === 'image_url') {
+                        // 这里的 url 可能是本地 Python 后端的链接
+                        contentHtml += `<img src="${item.image_url.url}" alt="image" onclick="window.open(this.src)">`;
+                    }
+                });
+            } else {
+                // 纯文本
+                contentHtml = escapeHtml(msg.content);
+            }
+
+            // 组装气泡结构
+            html = `
+                <div class="chat-item ${roleClass}">
+                    <div class="chat-meta">${roleName}</div>
+                    <div class="chat-bubble">${contentHtml}</div>
+                </div>
+            `;
+            $container.append(html);
+        });
+
+        // 自动滚动到底部
+        setTimeout(function() {
+            $container.scrollTop($container[0].scrollHeight);
+        }, 50);
+    }
+
+    // 辅助函数：防止 HTML 注入 (XSS)
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;")
+            // 简单处理换行符
+            .replace(/\n/g, "<br>");
     }
 
     // 等待 staticAPI 加载完成
@@ -531,8 +698,8 @@ function initModel(waifuPath, type) {
     });
     // 切换 UI 显示
     function toggleUI() {
-        var mode = live2d_settings.peekMode; // 直接使用全局配置
-        var target = live2d_settings.targetType;
+        var mode = $('#peek-mode').val();
+        var target = $('#peek-target-type').val();
         $('.prompt-group').hide();
         $('#group-prompt-' + mode).show();
         if (target === 'window') $('#group-window-select').show();
@@ -657,9 +824,12 @@ function initModel(waifuPath, type) {
     async function sendToLLM() {
         var input = $('#waifu-input');
         var text = input.val();
-        if (!text || text.trim() === '') return;
+        if ((!text || text.trim() === '') && !currentImageBase64) return;
         input.val('');
-        $('.waifu-chat-box').slideUp(200);
+
+        if (!$('.waifu-history-panel').hasClass('open')) {
+            $('.waifu-chat-box').slideUp(200);
+        }
 
         live2d_settings.isLLMThinking = true;
         live2d_settings.isLLMWriting = true;
@@ -687,9 +857,29 @@ function initModel(waifuPath, type) {
             } catch (e) { console.error("对话历史加载失败：", e); }
         }
 
+        var userMessageContent;
+        if (currentImageBase64) {
+            // 如果有图片，构造 OpenAI 多模态格式
+            userMessageContent = [
+                { 
+                    "type": "text", 
+                    "text": text || "请描述这张图片" 
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": currentImageBase64 // data:image/png;base64,......
+                    }
+                }
+            ];
+        } else {
+            // === 纯文本 ===
+            userMessageContent = text;
+        }
+
         messages.push(systemPrompt);
         messages = messages.concat(history);
-        messages.push({"role": "user", "content": text});
+        messages.push({"role": "user", "content": userMessageContent});
 
         try {
             llmAbortController = new AbortController(); 
@@ -715,8 +905,24 @@ function initModel(waifuPath, type) {
                 live2d_settings.isLLMWriting = true;
                 showMessage(reply, 6000, true);
                 if (live2d_settings.useMemory) {
+                    var storageUserMsg;
+
+                    if (currentImageUrl) {
+                        // 存 URL，为了节省空间
+                        // 这里为了简单，我们把图片标记在文本里，或者保留多模态结构但把 url 换成 http 链接
+                        storageUserMsg = {
+                            "role": "user",
+                            "content": [
+                                { "type": "text", "text": text || "[图片]" },
+                                { "type": "image_url", "image_url": { "url": currentImageUrl } } 
+                            ]
+                        };
+                    } else {
+                        storageUserMsg = { "role": "user", "content": text };
+                    }
+
                     // 推入新对话
-                    history.push({"role": "user", "content": text});
+                    history.push(storageUserMsg);
                     history.push({"role": "assistant", "content": reply});
 
                     // 限制条数 (1轮 = 2条消息)
@@ -736,7 +942,6 @@ function initModel(waifuPath, type) {
             }
         } catch (error) {
             if (error.name === 'AbortError') {
-                console.log('用户手动请求中止。');
                 live2d_settings.isLLMWriting = true;
                 showMessage("思考被中止了(>_<)... ", 4000, true)
             } else {
@@ -749,6 +954,10 @@ function initModel(waifuPath, type) {
             live2d_settings.isLLMWriting = false;
             llmAbortController = null;
             $('.waifu-tool .fui-pause').hide(); // 隐藏停止按钮
+            // TODO 清理图片数据，注释掉让用户不关闭图片时继续使用，加入设置？
+            // currentImageBase64 = null;
+            // currentImageUrl = null;
+            // $('#waifu-preview-close').click(); // 触发 UI 重置
         }
     }
 
