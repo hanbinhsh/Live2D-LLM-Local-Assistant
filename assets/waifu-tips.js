@@ -487,6 +487,7 @@ function initModel(waifuPath, type) {
     // 点击删除预览图
     $('#waifu-preview-close').click(function() {
         currentImageBase64 = null;
+        currentImageUrl = null;
         $('#waifu-file-input').val(''); // 清空 input，允许再次选择同一张图
         $('#waifu-img-preview-container').hide();
     });
@@ -602,6 +603,42 @@ function initModel(waifuPath, type) {
             .replace(/'/g, "&#039;")
             // 简单处理换行符
             .replace(/\n/g, "<br>");
+    }
+
+    // --- 动态追加单条消息到历史面板 ---
+    function appendHistoryItem(role, text, imgUrl) {
+        // 1. 如果面板没打开，就不需要实时渲染 DOM，等下次打开时 renderHistoryPanel 会自动读取最新 storage
+        if (!$('.waifu-history-panel').hasClass('open')) return;
+        var $container = $('#history-list');
+        // 如果是“暂无记录”状态，先清空
+        if ($container.find('.history-empty').length > 0) {
+            $container.empty();
+        }
+        var roleClass = role; 
+        var roleName = (role === 'user') ? '你' : '看板娘';
+        
+        var contentHtml = '';
+        // 处理文本
+        if (text) {
+            contentHtml += `<div>${escapeHtml(text)}</div>`;
+        }
+        
+        // 处理图片 (使用传入的 URL)
+        if (imgUrl) {
+            contentHtml += `<img src="${imgUrl}" alt="image" onclick="window.open(this.src)" style="max-width:100%; border-radius:4px; margin-top:5px; cursor:pointer; display:block;">`;
+        }
+        // 组装 HTML
+        var html = `
+            <div class="chat-item ${roleClass}">
+                <div class="chat-meta">${roleName}</div>
+                <div class="chat-bubble">${contentHtml}</div>
+            </div>
+        `;
+        // 追加并滚动
+        $container.append(html);
+        setTimeout(function() {
+            $container.scrollTop($container[0].scrollHeight);
+        }, 10);
     }
 
     // 等待 staticAPI 加载完成
@@ -827,16 +864,20 @@ function initModel(waifuPath, type) {
         if ((!text || text.trim() === '') && !currentImageBase64) return;
         input.val('');
 
+        // 仅当历史面板未打开时收起聊天框
         if (!$('.waifu-history-panel').hasClass('open')) {
             $('.waifu-chat-box').slideUp(200);
         }
 
+        appendHistoryItem('user', text, currentImageUrl); 
+
+        // 3. 状态锁与提示
         live2d_settings.isLLMThinking = true;
         live2d_settings.isLLMWriting = true;
         showMessage("正在思考中... ( •̀ ω •́ )y", 0, true);
         live2d_settings.isLLMWriting = false;
 
-        // 显示停止思考按钮
+        // 显示停止按钮
         $('.waifu-tool .fui-pause').show();
 
         var useThinking = live2d_settings.useThinkingWaifu;
@@ -848,18 +889,49 @@ function initModel(waifuPath, type) {
         var messages = [];
         var systemContent = live2d_settings.waifuPrompt || "你是一个网页看板娘，请用简短、可爱的语气回答，不要超过50个字。";
         var systemPrompt = {"role": "system", "content": systemContent};
-        var history = [];
+        
+        // --- 历史记录读取与清洗 ---
+        var history = []; // 用于保存回 LocalStorage 的原始数据 (含 URL)
+        var messagesForAPI = []; // 用于发给 Ollama 的清洗后数据 (不含 URL)
 
         if (live2d_settings.useMemory) {
             try {
                 var savedHistory = localStorage.getItem('waifu_chat_history');
-                if (savedHistory) history = JSON.parse(savedHistory);
+                if (savedHistory) {
+                    history = JSON.parse(savedHistory);
+                    
+                    // === 清洗逻辑开始 ===
+                    // 遍历历史，将 image_url (URL格式) 剔除，只保留文本，防止 Ollama 报错
+                    messagesForAPI = history.map(function(msg) {
+                        // 浅拷贝，防止修改原始 history 数组
+                        var newMsg = { role: msg.role };
+                        
+                        if (Array.isArray(msg.content)) {
+                            // 如果是多模态数组，过滤掉 image_url 类型
+                            var textParts = msg.content.filter(function(item) {
+                                return item.type === 'text';
+                            });
+                            
+                            // 提取文本内容
+                            if (textParts.length > 0) {
+                                newMsg.content = textParts[0].text; 
+                            } else {
+                                newMsg.content = "[用户发送了一张图片]"; // 占位符
+                            }
+                        } else {
+                            // 纯文本直接保留
+                            newMsg.content = msg.content;
+                        }
+                        return newMsg;
+                    });
+                    // === 清洗逻辑结束 ===
+                }
             } catch (e) { console.error("对话历史加载失败：", e); }
         }
 
+        // 构建当前用户消息 (使用 Base64)
         var userMessageContent;
         if (currentImageBase64) {
-            // 如果有图片，构造 OpenAI 多模态格式
             userMessageContent = [
                 { 
                     "type": "text", 
@@ -868,17 +940,17 @@ function initModel(waifuPath, type) {
                 {
                     "type": "image_url",
                     "image_url": {
-                        "url": currentImageBase64 // data:image/png;base64,......
+                        "url": currentImageBase64 
                     }
                 }
             ];
         } else {
-            // === 纯文本 ===
             userMessageContent = text;
         }
 
+        // 组装最终请求体
         messages.push(systemPrompt);
-        messages = messages.concat(history);
+        messages = messages.concat(messagesForAPI); // 这里拼接的是清洗后的数据
         messages.push({"role": "user", "content": userMessageContent});
 
         try {
@@ -890,7 +962,7 @@ function initModel(waifuPath, type) {
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + live2d_settings.llmApiKey },
                 body: JSON.stringify({
                     model: modelToUse,
-                    messages: messages, // 发送包含历史的消息组
+                    messages: messages,
                     temperature: 0.7,
                     stream: false
                 })
@@ -901,15 +973,18 @@ function initModel(waifuPath, type) {
 
             if (data.choices && data.choices.length > 0) {
                 let reply = data.choices[0].message.content;
-                // === 准备显示回复，临时开启写入权限 ===
+
                 live2d_settings.isLLMWriting = true;
                 showMessage(reply, 6000, true);
+
+                appendHistoryItem('assistant', reply, null);
+                
+                // --- 保存历史记录 (存 URL) ---
                 if (live2d_settings.useMemory) {
                     var storageUserMsg;
 
                     if (currentImageUrl) {
-                        // 存 URL，为了节省空间
-                        // 这里为了简单，我们把图片标记在文本里，或者保留多模态结构但把 url 换成 http 链接
+                        // 存 URL 到历史，节省空间
                         storageUserMsg = {
                             "role": "user",
                             "content": [
@@ -921,17 +996,14 @@ function initModel(waifuPath, type) {
                         storageUserMsg = { "role": "user", "content": text };
                     }
 
-                    // 推入新对话
+                    // 推入新对话到原始 history (包含 URL)
                     history.push(storageUserMsg);
                     history.push({"role": "assistant", "content": reply});
 
-                    // 限制条数 (1轮 = 2条消息)
+                    // 限制条数
                     var limit = parseInt(live2d_settings.memoryLimit) || 10;
                     var maxMsgs = limit * 2;
-
                     console.log("当前历史长度:", history.length, "| 限制:", maxMsgs);
-
-                    // 如果超出限制，保留最近的 N 条
                     if (history.length > maxMsgs) {
                         history = history.slice(history.length - maxMsgs);
                         console.log("对话历史已截断至", maxMsgs, "条消息");
