@@ -48,6 +48,7 @@ const default_settings = {
     canTurnToHomePage:  false,          // 显示 返回首页    按钮
     canTurnToAboutPage: false,          // 显示 跳转关于页  按钮
     showLLM:            true,           // 显示 LLM 对话    按钮
+    showHistory:        true,           // 显示 历史记录    按钮
     showPeek:           true,           // 显示 Peek        按钮
     showSettings:       true,           // 显示 设置        按钮
 
@@ -426,6 +427,7 @@ function initModel(waifuPath, type) {
         if (key === 'canTurnToAboutPage') toggleBtn($('.waifu-tool .fui-info-circle'), val);
         if (key === 'canCloseLive2d') toggleBtn($('.waifu-tool .fui-cross'), val);
         if (key === 'showLLM') toggleBtn($('.waifu-tool .fui-star'), val); 
+        if (key === 'showHistory') toggleBtn($('.waifu-tool .fui-mail'), val); 
         if (key === 'showPeek') toggleBtn($('.waifu-tool .fui-video'), val); 
         if (key === 'showSettings') toggleBtn($('.waifu-tool .fui-gear'), val); 
         
