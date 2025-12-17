@@ -4,10 +4,14 @@ import os
 import time
 import threading
 import webbrowser
+import socket
 from pystray import Icon, Menu, MenuItem
 from PIL import Image, ImageDraw
 
 print("[tray] start_tray.py launched")
+
+# 添加模块搜索路径，以便能 import python_server 下的模块 (如 config_manager)
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "python_server"))
 
 # ==================================================
 # Python 路径
@@ -15,6 +19,10 @@ print("[tray] start_tray.py launched")
 
 PYTHON_EXE = sys.executable
 PYTHONW_EXE = PYTHON_EXE.replace("python.exe", "pythonw.exe")
+WIDGET_CMD_PORT = 10453  # 必须与 live2d_window.py 一致
+
+# 定义子目录名称，方便后续拼接路径
+SUB_DIR = "python_server"
 
 print(f"[tray] python.exe  = {PYTHON_EXE}")
 print(f"[tray] pythonw.exe = {PYTHONW_EXE}")
@@ -25,9 +33,27 @@ print(f"[tray] pythonw.exe = {PYTHONW_EXE}")
 
 http_proc = None
 server_proc = None
+webview_proc = None
 
 server_console_visible = False   # 是否显示控制台
 server_running = False           # 是否正在运行
+widget_is_top = True             # 记录挂件是否置顶的状态
+widget_show_border = False       # 记录边框是否显示
+widget_can_drag = False          # 记录是否允许拖拽
+
+# ==================================================
+# UDP 通信工具 (用于控制挂件)
+# ==================================================
+
+def send_widget_cmd(msg):
+    """向桌面挂件发送指令"""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(msg.encode('utf-8'), ('127.0.0.1', WIDGET_CMD_PORT))
+        sock.close()
+        print(f"[tray] Sent command to widget: {msg}")
+    except Exception as e:
+        print(f"[tray] Failed to send command: {e}")
 
 # ==================================================
 # HTTP SERVER
@@ -67,11 +93,14 @@ def start_server():
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUNBUFFERED"] = "1"
+    
+    # 【修改点】路径拼接
+    script_path = os.path.join(SUB_DIR, "server.py")
 
     if server_console_visible:
         print("[tray] starting server.py WITH console")
         server_proc = subprocess.Popen(
-            [PYTHON_EXE, "server.py"],
+            [PYTHON_EXE, script_path], # 修改这里
             creationflags=subprocess.CREATE_NEW_CONSOLE,
             env=env
         )
@@ -90,7 +119,7 @@ def start_server():
             return
 
         server_proc = subprocess.Popen(
-            [PYTHONW_EXE, "server.py"],
+            [PYTHONW_EXE, script_path], # 修改这里
             creationflags=subprocess.CREATE_NO_WINDOW,
             stdout=stdout_file,
             stderr=stderr_file,
@@ -171,16 +200,221 @@ def monitor_server_exit():
                 start_server()
 
 # ==================================================
-# 浏览器跳转 [修改部分]
+# 实时读取子进程输出并打印 (辅助函数)
+# ==================================================
+def log_subprocess_output(pipe, prefix):
+    """
+    在独立线程中运行，实时读取子进程管道并在主控制台打印
+    """
+    try:
+        # iter(pipe.readline, '') 会持续读取直到管道关闭
+        for line in iter(pipe.readline, ''):
+            # line 包含换行符，strip() 去掉它，避免多余空行
+            print(f"{prefix} {line.strip()}")
+    except Exception as e:
+        print(f"{prefix} Log Error: {e}")
+    finally:
+        pipe.close()
+
+# ==================================================
+# 看板娘窗口
 # ==================================================
 
-def open_live2d(icon=None, item=None):
+def start_webview():
+    global webview_proc
+    
+    if webview_proc and webview_proc.poll() is None:
+        print("[tray] webview is already running")
+        return
+
+    print("[tray] starting live2d_window.py with output capture...")
+    
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    
+    # 【修改点】路径拼接
+    script_path = os.path.join(SUB_DIR, "live2d_window.py")
+
+    webview_proc = subprocess.Popen(
+        [PYTHON_EXE, script_path], # 修改这里
+        creationflags=subprocess.CREATE_NO_WINDOW,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env
+    )
+    
+    # 启动日志线程... (保持不变)
+    t_out = threading.Thread(target=log_subprocess_output, args=(webview_proc.stdout, "[Live2D Info]"))
+    t_out.daemon = True; t_out.start()
+    t_err = threading.Thread(target=log_subprocess_output, args=(webview_proc.stderr, "[Live2D Error]"))
+    t_err.daemon = True; t_err.start()
+    
+    # 初始化状态
+    global widget_is_top, widget_can_drag, widget_show_border
+    
+    import config_manager
+    cfg = config_manager.load_config()
+    widget_is_top = cfg.get("top", True)
+    widget_can_drag = cfg.get("draggable", False)
+    widget_show_border = False 
+
+def open_widget_settings_window(icon=None, item=None):
+    """启动 Python 设置面板"""
+    print("[tray] starting settings_window.py")
+    # 【修改点】路径拼接 (虽然你下面还有一个 geometry settings 函数，但为了保险这里也改)
+    script_path = os.path.join(SUB_DIR, "settings_window.py")
+    subprocess.Popen([PYTHONW_EXE, script_path], creationflags=subprocess.CREATE_NO_WINDOW)
+
+def stop_webview():
+    global webview_proc
+    if webview_proc and webview_proc.poll() is None:
+        print("[tray] stopping live2d_window.py")
+        webview_proc.terminate()
+    webview_proc = None
+
+def toggle_webview(icon=None, item=None):
+    """开关看板娘 (带记忆功能)"""
+    global webview_proc
+    
+    import config_manager
+    
+    if webview_proc and webview_proc.poll() is None:
+        stop_webview()
+        config_manager.save_config({"show_widget": False})
+    else:
+        start_webview()
+        config_manager.save_config({"show_widget": True})
+
+def is_webview_running(item):
+    return webview_proc and webview_proc.poll() is None
+
+# ==================================================
+# 拖拽与边框控制函数
+# ==================================================
+
+def toggle_widget_drag(icon=None, item=None):
+    """切换是否允许拖拽"""
+    global widget_can_drag
+    widget_can_drag = not widget_can_drag
+    
+    import config_manager
+    config_manager.save_config({"draggable": widget_can_drag})
+    
+    cmd = "drag:on" if widget_can_drag else "drag:off"
+    send_widget_cmd(cmd)
+
+def is_widget_drag(item):
+    return widget_can_drag
+
+def toggle_widget_border(icon=None, item=None):
+    """切换是否显示边框"""
+    global widget_show_border
+    widget_show_border = not widget_show_border
+    
+    cmd = "border:on" if widget_show_border else "border:off"
+    send_widget_cmd(cmd)
+
+def is_widget_border(item):
+    return widget_show_border
+
+# 托盘切换点击穿透
+def toggle_widget_click_through(icon=None, item=None):
+    """切换点击穿透"""
+    import config_manager
+    cfg = config_manager.load_config()
+    new_state = not cfg.get("click_through", False)
+    
+    config_manager.save_config({"click_through": new_state})
+    
+    # 发送指令给挂件立即更新
+    cmd = "click_through:on" if new_state else "click_through:off"
+    send_widget_cmd(cmd)
+
+def is_click_through(item):
+    import config_manager
+    cfg = config_manager.load_config()
+    return cfg.get("click_through", False)
+
+# ==================================================
+# 菜单功能逻辑
+# ==================================================
+
+def open_widget_geometry_settings(icon=None, item=None):
+    """启动 settings_window.py 并捕获输出"""
+    print("[tray] starting settings_window.py (Geometry)...")
+    
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    
+    # 【修改点】路径拼接
+    script_path = os.path.join(SUB_DIR, "settings_window.py")
+
+    proc = subprocess.Popen(
+        [PYTHON_EXE, script_path], # 修改这里
+        creationflags=subprocess.CREATE_NO_WINDOW,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env
+    )
+
+    t_out = threading.Thread(
+        target=log_subprocess_output, 
+        args=(proc.stdout, "[Settings Info]")
+    )
+    t_out.daemon = True 
+    t_out.start()
+
+    t_err = threading.Thread(
+        target=log_subprocess_output, 
+        args=(proc.stderr, "[Settings Error]")
+    )
+    t_err.daemon = True
+    t_err.start()
+
+
+def open_widget_web_settings(icon=None, item=None):
+    """发送指令给挂件，让其在内部打开 Web 设置窗口"""
+    print("[tray] sending open_web_settings command")
+    
+    if not is_webview_running(None):
+        start_webview()
+        time.sleep(1) 
+        
+    send_widget_cmd("open_web_settings")
+
+def reload_widget(icon=None, item=None):
+    """发送重载指令，让看板娘应用新的 Web 设置"""
+    send_widget_cmd("reload")
+
+def open_widget_debug(icon=None, item=None):
+    url = "http://127.0.0.1:9222"
+    webbrowser.open(url)
+
+def toggle_widget_top(icon=None, item=None):
+    """托盘快捷切换置顶"""
+    import config_manager
+    cfg = config_manager.load_config()
+    
+    new_state = not cfg["top"]
+    config_manager.save_config({"top": new_state})
+    
+    send_widget_cmd("update_cfg")
+
+def is_widget_top(item):
+    import config_manager
+    cfg = config_manager.load_config()
+    return cfg.get("top", True)
+
+# --- 组2: 外部浏览器 ---
+def open_external_live2d(icon=None, item=None):
     """新增：打开看板娘页面"""
     url = "http://127.0.0.1:10452/live2d.html"
     print(f"[tray] Opening browser: {url}")
     webbrowser.open(url)
 
-def open_settings(icon=None, item=None):
+def open_external_settings(icon=None, item=None):
     """打开设置页面"""
     url = "http://127.0.0.1:10452/settings.html"
     print(f"[tray] Opening browser: {url}")
@@ -216,11 +450,9 @@ def update_tray_icon():
 
 tray_icon = None
 
-def menu_console_text(item):
-    return "隐藏控制台" if server_console_visible else "显示控制台"
-
 def on_exit(icon, item):
     print("[tray] exiting, stopping all services")
+    stop_webview()
     stop_server()
     stop_http()
     icon.stop()
@@ -237,10 +469,33 @@ def run_tray():
         create_icon_image("red"),
         "Server: stopped",
         menu=Menu(
-            MenuItem("打开看板娘", open_live2d),         # <--- [新增] 1. 打开看板娘
-            MenuItem("打开设置页面", open_settings),      # <--- 2. 打开设置
-            MenuItem(menu_console_text, toggle_server_console),
-            MenuItem("重启 server.py", lambda i, x: restart_server()),
+            # --- 核心控制 ---
+            MenuItem("显示/隐藏桌面挂件", toggle_webview, checked=is_webview_running),
+            MenuItem("窗口置顶", toggle_widget_top, checked=is_widget_top),
+            MenuItem("解锁位置", toggle_widget_drag, checked=is_widget_drag),
+            MenuItem("显示边界框", toggle_widget_border, checked=is_widget_border),
+            MenuItem("点击穿透", toggle_widget_click_through, checked=is_click_through),
+            
+            # --- 两个设置入口 ---
+            Menu.SEPARATOR,
+            MenuItem("看板娘配置", open_widget_web_settings),
+            MenuItem("窗口及性能配置", open_widget_geometry_settings),
+            MenuItem("刷新看板娘", reload_widget),
+            
+            Menu.SEPARATOR,
+
+            # --- 外部浏览器 ---
+            MenuItem("打开看板娘 (外部)", open_external_live2d),
+            MenuItem("打开设置页 (外部)", open_external_settings),
+
+            Menu.SEPARATOR,
+            
+            # --- 后端 ---
+            MenuItem("显示 Python 控制台", toggle_server_console, checked=lambda i: server_console_visible),
+            MenuItem("打开网页控制台", open_widget_debug),
+            MenuItem("重启 server.py", restart_server),
+            
+            Menu.SEPARATOR,
             MenuItem("关闭所有服务", on_exit),
         )
     )
@@ -257,6 +512,16 @@ if __name__ == "__main__":
 
     http_proc = start_http()
     start_server()
+
+    # --- 修改部分：根据配置决定是否启动看板娘 ---
+    import config_manager
+    cfg = config_manager.load_config()
+    
+    # 默认为 True，如果是 False 则不启动
+    if cfg.get("show_widget", True):
+        start_webview()
+    else:
+        print("[tray] Widget is disabled in config, skipping startup.")
 
     threading.Thread(
         target=monitor_server_exit,

@@ -7,3 +7,11 @@ log/
 trash/
 
 storage/
+
+__pycache__/
+
+python_server/__pycache__/
+
+.vscode/
+
+widget_config.json

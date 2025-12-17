@@ -29,10 +29,20 @@ app.add_middleware(
 OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 OLLAMA_API = OLLAMA_BASE_URL + "/api/generate"
 TARGET_SIZE = (1280, 720)
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "storage", "image_upload")
+
+# 【修改点】由于 server.py 在 python_server 目录下，我们需要向上走两层（或指定绝对路径）
+# 来确保 storage 文件夹在项目根目录下
+# os.path.dirname(__file__) 是 python_server/
+# os.path.dirname(...) 是 root/
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+UPLOAD_DIR = os.path.join(PROJECT_ROOT, "storage", "image_upload")
+STORAGE_ROOT = os.path.join(PROJECT_ROOT, "storage")
 
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
+
+# 【修改点】挂载静态文件目录，使用绝对路径确保指向正确
+app.mount("/storage", StaticFiles(directory=STORAGE_ROOT), name="storage")
 
 class ImageUploadRequest(BaseModel):
     base64_data: str  # 包含 header 的 base64 字符串
@@ -101,7 +111,7 @@ def get_active_window_title():
 
 def capture_screen_base64(target_type, target_hwid):
     """根据类型截图：全屏 或 特定窗口"""
-    save_path = os.path.join(os.path.dirname(__file__), "debug_preview.jpg")
+    save_path = os.path.join(os.path.dirname(__file__), "../storage/debug_preview.jpg")
 
     try:
         if target_type == "window" and target_hwid > 0:

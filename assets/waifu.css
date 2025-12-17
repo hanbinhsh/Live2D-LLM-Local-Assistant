@@ -572,6 +572,7 @@
     cursor: pointer;
     transition: background 0.2s;
     border-radius: 10px;
+    margin-bottom: 1px;
 }
 
 /* 图片预览容器 */
