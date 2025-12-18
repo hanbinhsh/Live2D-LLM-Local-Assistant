@@ -269,6 +269,8 @@ class TransparentLive2DWindow(QMainWindow):
         # 而且直接setWindowFlags为原先的flag，由于缓存机制，不会触发刷新
         # 所以我们通过一个中间状态来强制刷新
         target_flags = Qt.FramelessWindowHint | Qt.Tool
+        if self.is_top: target_flags |= Qt.WindowStaysOnTopHint
+        if self.click_through: target_flags |= Qt.WindowTransparentForInput
         self.setWindowOpacity(float(self.cfg.get("opacity", 1.0)))
         temp_flags = target_flags ^ Qt.WindowStaysOnTopHint 
         self.setWindowFlags(temp_flags)
