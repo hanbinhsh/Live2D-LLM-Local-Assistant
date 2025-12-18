@@ -5,6 +5,8 @@ import time
 import threading
 import webbrowser
 import socket
+import tkinter as tk
+from tkinter import messagebox
 from pystray import Icon, Menu, MenuItem
 from PIL import Image, ImageDraw
 
@@ -72,6 +74,87 @@ def stop_http():
         print("[tray] stopping http.server")
         http_proc.terminate()
     http_proc = None
+
+# ==================================================
+# 端口检测与清理工具 (交互式版)
+# ==================================================
+
+def get_process_name_by_pid(pid):
+    """通过 PID 获取进程名称"""
+    try:
+        # tasklist /FI "PID eq 12345" /FO CSV /NH
+        cmd = f'tasklist /FI "PID eq {pid}" /FO CSV /NH'
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if result.stdout:
+            # 输出格式通常为: "image_name","pid",...
+            # 例如: "python.exe","12345","Console","1","10,000 K"
+            parts = result.stdout.strip().split(',')
+            if len(parts) > 0:
+                return parts[0].replace('"', '')
+    except:
+        pass
+    return "Unknown"
+
+def check_and_kill_port(port):
+    """
+    检查端口占用，弹出窗口询问用户是否查杀
+    """
+    print(f"[tray] Checking port {port}...")
+    try:
+        # 1. 查找占用端口的 PID
+        cmd = f'netstat -ano | findstr :{port}'
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        
+        if not result.stdout:
+            print(f"[tray] Port {port} is free.")
+            return
+
+        lines = result.stdout.strip().split('\n')
+        pids = set()
+        for line in lines:
+            parts = line.split()
+            # TCP 0.0.0.0:10452 ... LISTENING 12345
+            if len(parts) > 4 and str(port) in parts[1]: 
+                pid = parts[-1]
+                if pid != "0": # 忽略 System Idle Process
+                    pids.add(pid)
+        
+        if not pids:
+            return
+
+        print(f"[tray] Port {port} occupied by PIDs: {pids}")
+
+        # 2. 遍历 PID 并询问用户
+        for pid in pids:
+            proc_name = get_process_name_by_pid(pid)
+            
+            # 初始化一个隐藏的 tk 主窗口用于弹窗
+            root = tk.Tk()
+            root.withdraw() # 隐藏主窗口
+            root.attributes('-topmost', True) # 确保弹窗在最前
+            
+            msg = (f"端口 {port} 正被进程占用：\n\n"
+                   f"进程名: {proc_name}\n"
+                   f"PID: {pid}\n\n"
+                   f"是否强制关闭该进程？\n"
+                   f"(点击'是'关闭进程，点击'否'忽略)")
+            
+            user_choice = messagebox.askyesno("端口冲突警告", msg)
+            root.destroy() # 销毁 tk 窗口
+
+            if user_choice:
+                try:
+                    subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True)
+                    print(f"[tray] User chose to KILL PID {pid} ({proc_name})")
+                except Exception as e:
+                    print(f"[tray] Failed to kill PID {pid}: {e}")
+            else:
+                print(f"[tray] User chose to IGNORE PID {pid} ({proc_name})")
+                
+        time.sleep(0.5)
+        
+    except Exception as e:
+        print(f"[tray] Port check failed: {e}")
 
 # ==================================================
 # SERVER.PY
@@ -534,6 +617,9 @@ def run_tray():
 
 if __name__ == "__main__":
     print("[tray] boot services")
+
+    check_and_kill_port(10452) # HTTP Server
+    check_and_kill_port(11542) # Python Backend (server.py)
 
     http_proc = start_http()
     start_server()

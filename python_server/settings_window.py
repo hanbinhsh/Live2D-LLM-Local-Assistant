@@ -11,7 +11,7 @@ class SettingsWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("桌面挂件设置")
-        self.resize(380, 550) # 调高一点以容纳新选项
+        self.resize(380, 450) # 调高一点以容纳新选项
         
         self.cfg = config_manager.load_config()
         self.init_ui()
@@ -25,34 +25,7 @@ class SettingsWindow(QWidget):
     def init_ui(self):
         layout = QVBoxLayout()
 
-        # --- 1. 状态设置 ---
-        group_state = QGroupBox("状态与交互")
-        layout_state = QVBoxLayout()
-        
-        self.chk_top = QCheckBox("窗口置顶")
-        self.chk_top.setChecked(self.cfg["top"])
-        self.chk_top.toggled.connect(self.on_change)
-        layout_state.addWidget(self.chk_top)
-
-        self.chk_drag = QCheckBox("允许鼠标拖拽移动")
-        self.chk_drag.setChecked(self.cfg["draggable"])
-        self.chk_drag.toggled.connect(self.on_change)
-        layout_state.addWidget(self.chk_drag)
-        
-        # 【新增】点击穿透
-        self.chk_through = QCheckBox("点击穿透")
-        self.chk_through.setToolTip("开启后鼠标将穿过看板娘，无法进行点击交互。\n如需恢复，请在此处或托盘菜单关闭。")
-        self.chk_through.setStyleSheet("color: blue;") # 醒目一点
-        self.chk_through.setChecked(self.cfg.get("click_through", False))
-        self.chk_through.toggled.connect(self.on_change)
-        layout_state.addWidget(self.chk_through)
-
-        layout_state.addLayout(self.create_double_spin_row("整体透明度 (0.1-1.0):", "opacity", 0.01, 1.0, 0.1))
-        
-        group_state.setLayout(layout_state)
-        layout.addWidget(group_state)
-
-        # --- 2. 交互优化 (新增) ---
+        # --- 1. 交互优化 ---
         group_opt = QGroupBox("跟踪与性能优化")
         layout_opt = QVBoxLayout()
         
@@ -69,7 +42,7 @@ class SettingsWindow(QWidget):
         group_opt.setLayout(layout_opt)
         layout.addWidget(group_opt)
 
-        # --- 3. 尺寸位置 ---
+        # --- 2. 尺寸位置 ---
         group_geo = QGroupBox("位置与大小")
         layout_geo = QVBoxLayout()
 
@@ -77,11 +50,12 @@ class SettingsWindow(QWidget):
         layout_geo.addLayout(self.create_spin_row("高度:", "height", 100, 2000))
         layout_geo.addLayout(self.create_spin_row("X 坐标:", "x", -5000, 5000))
         layout_geo.addLayout(self.create_spin_row("Y 坐标:", "y", -5000, 5000))
+        layout_geo.addLayout(self.create_double_spin_row("整体透明度 (0.1-1.0):", "opacity", 0.01, 1.0, 0.1))
 
         group_geo.setLayout(layout_geo)
         layout.addWidget(group_geo)
 
-        # --- 4. 按钮区 ---
+        # --- 3. 按钮区 ---
         btn_refresh = QPushButton("读取当前挂件位置")
         btn_refresh.clicked.connect(self.reload_from_config)
         layout.addWidget(btn_refresh)
@@ -131,9 +105,6 @@ class SettingsWindow(QWidget):
         """保存配置并通知挂件"""
         new_cfg = self.cfg.copy()
         new_cfg.update({
-            "top": self.chk_top.isChecked(),
-            "draggable": self.chk_drag.isChecked(),
-            "click_through": self.chk_through.isChecked(),
             "opacity": self.dspin_opacity.value(),
             "width": self.spin_width.value(),
             "height": self.spin_height.value(),
@@ -154,9 +125,6 @@ class SettingsWindow(QWidget):
         self.spin_y.setValue(self.cfg["y"])
         self.spin_width.setValue(self.cfg["width"])
         self.spin_height.setValue(self.cfg["height"])
-        self.chk_top.setChecked(self.cfg["top"])
-        self.chk_drag.setChecked(self.cfg["draggable"])
-        self.chk_through.setChecked(self.cfg.get("click_through", False))
         self.dspin_opacity.setValue(self.cfg.get("opacity", 1.0))
         self.spin_track_refresh.setValue(self.cfg.get("track_refresh", 30))
         self.spin_track_threshold.setValue(self.cfg.get("track_threshold", 10))
