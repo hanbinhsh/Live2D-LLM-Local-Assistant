@@ -11,10 +11,14 @@ DEFAULT_CONFIG = {
     "top": True,
     "draggable": False,
     "show_widget": True,
-    "click_through": False,   # 是否开启点击穿透
-    "idle_timeout": 2.0,      # 鼠标静止多久后触发移出 (秒)
-    "track_refresh": 30,      # 鼠标追踪刷新率 (ms)，越小越流畅但耗CPU
-    "track_threshold": 10     # 抖动过滤阈值 (px)
+
+    "opacity": 1.0,         # 透明度 (0.1 ~ 1.0)
+    "click_through": False, # 点击穿透 (鼠标穿过窗口)
+    
+    # --- 性能/交互 ---
+    "track_refresh": 30,    # 鼠标刷新率 ms
+    "track_threshold": 10,  # 防抖阈值 px
+    "idle_timeout": 2.0,    # 闲置判定时间 s
 }
 
 def load_config():

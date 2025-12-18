@@ -2,3 +2,8 @@
 http://127.0.0.1:10452/live2d.html
 
 调试请关闭网页缓存，在f12网络页面下
+
+添加模型：
+1. 将模型拖入live2d_api-master/model
+2. 修改model_list.json
+3. 运行gene-config-file.py

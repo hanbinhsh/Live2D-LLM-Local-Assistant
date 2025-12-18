@@ -29,7 +29,7 @@ class SettingsWindow(QWidget):
         group_state = QGroupBox("状态与交互")
         layout_state = QVBoxLayout()
         
-        self.chk_top = QCheckBox("窗口置顶 (Always on Top)")
+        self.chk_top = QCheckBox("窗口置顶")
         self.chk_top.setChecked(self.cfg["top"])
         self.chk_top.toggled.connect(self.on_change)
         layout_state.addWidget(self.chk_top)
@@ -40,12 +40,14 @@ class SettingsWindow(QWidget):
         layout_state.addWidget(self.chk_drag)
         
         # 【新增】点击穿透
-        self.chk_through = QCheckBox("点击穿透 (游戏模式)")
+        self.chk_through = QCheckBox("点击穿透")
         self.chk_through.setToolTip("开启后鼠标将穿过看板娘，无法进行点击交互。\n如需恢复，请在此处或托盘菜单关闭。")
         self.chk_through.setStyleSheet("color: blue;") # 醒目一点
         self.chk_through.setChecked(self.cfg.get("click_through", False))
         self.chk_through.toggled.connect(self.on_change)
         layout_state.addWidget(self.chk_through)
+
+        layout_state.addLayout(self.create_double_spin_row("整体透明度 (0.1-1.0):", "opacity", 0.01, 1.0, 0.1))
         
         group_state.setLayout(layout_state)
         layout.addWidget(group_state)
@@ -132,6 +134,7 @@ class SettingsWindow(QWidget):
             "top": self.chk_top.isChecked(),
             "draggable": self.chk_drag.isChecked(),
             "click_through": self.chk_through.isChecked(),
+            "opacity": self.dspin_opacity.value(),
             "width": self.spin_width.value(),
             "height": self.spin_height.value(),
             "x": self.spin_x.value(),
@@ -154,7 +157,7 @@ class SettingsWindow(QWidget):
         self.chk_top.setChecked(self.cfg["top"])
         self.chk_drag.setChecked(self.cfg["draggable"])
         self.chk_through.setChecked(self.cfg.get("click_through", False))
-        # 新增字段的刷新
+        self.dspin_opacity.setValue(self.cfg.get("opacity", 1.0))
         self.spin_track_refresh.setValue(self.cfg.get("track_refresh", 30))
         self.spin_track_threshold.setValue(self.cfg.get("track_threshold", 10))
         self.dspin_idle_timeout.setValue(self.cfg.get("idle_timeout", 2.0))
@@ -167,7 +170,7 @@ class SettingsWindow(QWidget):
         if reply == QMessageBox.Yes:
             defaults = {
                 "x": -1, "y": -1, "width": 380, "height": 400,
-                "track_refresh": 30, "track_threshold": 10, "idle_timeout": 2.0
+                "track_refresh": 30, "track_threshold": 10, "idle_timeout": 2.0, "opacity": 1.0
             }
             config_manager.save_config(defaults)
             self.reload_from_config()

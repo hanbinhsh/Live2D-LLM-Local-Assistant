@@ -153,6 +153,30 @@ def restart_server():
     time.sleep(0.3)
     start_server()
 
+def restart_all_services(icon=None, item=None):
+    """重启所有服务 (HTTP, Server, Webview)"""
+    print("[tray] Restarting ALL services...")
+    
+    # 1. 停止
+    stop_webview()
+    stop_server()
+    stop_http()
+    
+    time.sleep(1) # 缓冲
+    
+    # 2. 启动
+    global http_proc
+    http_proc = start_http()
+    start_server()
+    
+    # 根据配置决定是否启动挂件
+    import config_manager
+    cfg = config_manager.load_config()
+    if cfg.get("show_widget", True):
+        start_webview()
+        
+    print("[tray] All services restarted.")
+
 # ==================================================
 # 控制台切换
 # ==================================================
@@ -484,18 +508,19 @@ def run_tray():
             
             Menu.SEPARATOR,
 
-            # --- 外部浏览器 ---
-            MenuItem("打开看板娘 (外部)", open_external_live2d),
-            MenuItem("打开设置页 (外部)", open_external_settings),
-
-            Menu.SEPARATOR,
+            MenuItem("调试与高级", Menu(
+                # 外部浏览器组
+                MenuItem("打开看板娘 (外部浏览器)", open_external_live2d),
+                MenuItem("打开设置页 (外部浏览器)", open_external_settings),
+                Menu.SEPARATOR,
+                # 后端控制组
+                MenuItem("显示 Python 控制台", toggle_server_console, checked=lambda i: server_console_visible),
+                MenuItem("打开网页控制台 (Debug)", open_widget_debug),
+                MenuItem("重启 server.py (后端)", restart_server),
+            )),
             
-            # --- 后端 ---
-            MenuItem("显示 Python 控制台", toggle_server_console, checked=lambda i: server_console_visible),
-            MenuItem("打开网页控制台", open_widget_debug),
-            MenuItem("重启 server.py", restart_server),
-            
             Menu.SEPARATOR,
+            MenuItem("重启所有服务", restart_all_services),
             MenuItem("关闭所有服务", on_exit),
         )
     )

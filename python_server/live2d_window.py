@@ -130,6 +130,7 @@ class TransparentLive2DWindow(QMainWindow):
     def init_ui(self):
         self.update_window_flags()
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setWindowOpacity(self.cfg.get("opacity", 1.0))
         self.resize(self.cfg["width"], self.cfg["height"])
         if self.cfg["x"] != -1: self.move(self.cfg["x"], self.cfg["y"])
         else:
@@ -148,7 +149,7 @@ class TransparentLive2DWindow(QMainWindow):
         flags = Qt.FramelessWindowHint | Qt.Tool
         if self.is_top: flags |= Qt.WindowStaysOnTopHint
         
-        # 【新增】点击穿透标志
+        # 点击穿透标志
         # 注意：开启穿透后，窗口将不再接收鼠标事件（包括拖拽）
         if self.click_through:
             flags |= Qt.WindowTransparentForInput
@@ -246,7 +247,6 @@ class TransparentLive2DWindow(QMainWindow):
                 mode = parts[1]
                 self.draggable = (mode == "on")
                 self.cfg["draggable"] = self.draggable
-            # 【新增】点击穿透控制 (虽然 update_cfg 也能处理，但单独指令响应更快)
             elif action == "click_through":
                 mode = parts[1]
                 self.click_through = (mode == "on")
@@ -263,6 +263,20 @@ class TransparentLive2DWindow(QMainWindow):
         self.settings_win.raise_()
         self.settings_win.activateWindow()
 
+    def update_opacity(self):
+        # 为什么要这么写？
+        # 因为直接调用 setWindowOpacity 不会立即生效，需要通过切换窗口标志强制刷新
+        # 而且直接setWindowFlags为原先的flag，由于缓存机制，不会触发刷新
+        # 所以我们通过一个中间状态来强制刷新
+        target_flags = Qt.FramelessWindowHint | Qt.Tool
+        self.setWindowOpacity(float(self.cfg.get("opacity", 1.0)))
+        temp_flags = target_flags ^ Qt.WindowStaysOnTopHint 
+        self.setWindowFlags(temp_flags)
+        self.show()
+        self.setWindowFlags(target_flags)
+        self.show()
+
+
     def apply_config_dynamically(self):
         self.resize(self.cfg["width"], self.cfg["height"])
         if self.cfg["x"] == -1 or self.cfg["y"] == -1:
@@ -274,6 +288,8 @@ class TransparentLive2DWindow(QMainWindow):
             self.move(self.cfg["x"], self.cfg["y"])
         
         self.draggable = self.cfg["draggable"]
+
+        self.update_opacity()
         
         # 更新穿透状态
         if self.click_through != self.cfg.get("click_through", False):
@@ -285,7 +301,7 @@ class TransparentLive2DWindow(QMainWindow):
             self.is_top = self.cfg["top"]
             self.update_window_flags()
             
-        # 【新增】如果刷新率变了，重启定时器
+        # 如果刷新率变了，重启定时器
         new_refresh = self.cfg.get("track_refresh", 30)
         if self.mouse_track_timer.interval() != new_refresh:
             self.mouse_track_timer.start(new_refresh)
