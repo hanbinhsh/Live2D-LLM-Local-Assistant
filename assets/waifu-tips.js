@@ -145,29 +145,52 @@ function localAPI(action, modelID, texturesID=0){
         }
         loadModel(newModelID, 0);
         showMessage(staticAPI.model_list.messages[newModelID], 3000, true);
-    } else if (action === 'randTextures'){
+    } else if (action === 'randTextures' || action === 'switchTextures'){
+        
+        // 1. 获取当前模型总共有多少个皮肤
         let totalTexturesNum;
         if(typeof staticAPI.model_list.models[modelID] === 'string'){
             totalTexturesNum = staticAPI.Textures[modelID].length;
         } else {
             totalTexturesNum = staticAPI.model_list.models[modelID].length;
         }
-        let newTextureID = Math.floor(Math.random()*totalTexturesNum);
-        while(newTextureID === texturesID){
+
+        // 2. 【关键修复】如果只有1个皮肤，直接提示并退出，防止死循环
+        if (totalTexturesNum <= 1) {
+            // 尝试读取 waifu_tips 里的文本，如果没有则用默认文本
+            var text = "我还没有其他衣服呢";
+            if (window.waifu_tips && window.waifu_tips.waifu && window.waifu_tips.waifu.load_rand_textures) {
+                text = window.waifu_tips.waifu.load_rand_textures[0]; 
+            }
+            showMessage(text, 3000, true);
+            return; 
+        }
+
+        // 3. 计算新的 ID
+        let newTextureID;
+        if (action === 'randTextures') {
+            // 随机逻辑
             newTextureID = Math.floor(Math.random()*totalTexturesNum);
-        }
-        loadModel(modelID, newTextureID);
-    } else if (action === 'switchTextures'){
-        let totalTexturesNum;
-        if(typeof staticAPI.model_list.models[modelID] === 'string'){
-            totalTexturesNum = staticAPI.Textures[modelID].length;
+            // 只有当 total > 1 时，while 循环才是安全的
+            while(newTextureID === texturesID){
+                newTextureID = Math.floor(Math.random()*totalTexturesNum);
+            }
         } else {
-            totalTexturesNum = staticAPI.model_list.models[modelID].length;
+            // 顺序切换逻辑
+            newTextureID = texturesID + 1;
+            if(newTextureID >= totalTexturesNum){
+                newTextureID = 0;
+            }
         }
-        let newTextureID = texturesID + 1;
-        if(newTextureID >= totalTexturesNum && newTextureID !== 0){
-            newTextureID = 0;
+
+        // 4. 显示切换成功的提示
+        var successText = "我的新衣服好看吗";
+        if (window.waifu_tips && window.waifu_tips.waifu && window.waifu_tips.waifu.load_rand_textures) {
+            successText = window.waifu_tips.waifu.load_rand_textures[1]; 
         }
+        showMessage(successText, 3000, true);
+
+        // 5. 加载新皮肤
         loadModel(modelID, newTextureID);
     }
 }
