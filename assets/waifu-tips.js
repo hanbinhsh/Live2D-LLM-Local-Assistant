@@ -22,116 +22,13 @@
 // ==========================================
 //       1. 全局配置默认值定义 (统一入口)
 // ==========================================
-const default_settings = {
-    // --- 静态资源配置 ---
-    staticAPIFile: 'live2d_api-master/model/static-api-file.json',
-    staticPath: 'live2d_api-master/model/',
-    defaultModel: '{"version":"1.0.0","model":"MODEL_HOME/Potion-Maker/Pio/model.moc","textures":["MODEL_HOME/Potion-Maker/Pio/textures/default-costume.png"],"layout":{"center_x":0.0,"center_y":-0.05,"width":2.0},"hit_areas_custom":{"head_x":[-0.35,0.6],"head_y":[0.19,-0.2],"body_x":[-0.3,-0.25],"body_y":[0.3,-0.9]},"motions":{"idle":[{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Breath1.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Breath2.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Breath3.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Breath5.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Breath7.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Breath8.mtn"}],"sleepy":[{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Sleeping.mtn"}],"flick_head":[{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch Dere1.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch Dere2.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch Dere3.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch Dere4.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch Dere5.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch Dere6.mtn"}],"tap_body":[{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Sukebei1.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Sukebei2.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Sukebei3.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch1.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch2.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch3.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch4.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch5.mtn"},{"file":"MODEL_HOME/Potion-Maker/Pio/motions/Touch6.mtn"}]}}',
 
-    // --- 后端接口 ---
-    tipsMessage: 'waifu-tips.json',     // 同目录下可省略路径
-    hitokotoAPI: 'hitokoto.cn',         // 一言 API，可选 'lwl12.com', 'hitokoto.cn', 'jinrishici.com'(古诗词), 'fghrsh.net'
-
-    // --- 默认状态 ---
-    modelId:            0,              // 默认模型 ID，可在 F12 控制台找到
-    modelTexturesId:    61,             // 默认材质 ID，可在 F12 控制台找到
-    nowModelID:         0,              
-    nowTexturesID:      0,              
-
-    // --- 工具栏开关 ---
-    showToolMenu:       true,           // 显示 工具栏，可选 true(真), false(假)
-    canCloseLive2d:     false,          // 显示 关闭看板娘  按钮
-    canSwitchModel:     true,           // 显示 模型切换    按钮
-    canSwitchTextures:  true,           // 显示 材质切换    按钮
-    canSwitchHitokoto:  true,           // 显示 一言切换    按钮
-    canTakeScreenshot:  false,          // 显示 看板娘截图  按钮
-    canTurnToHomePage:  false,          // 显示 返回首页    按钮
-    canTurnToAboutPage: false,          // 显示 跳转关于页  按钮
-    showLLM:            true,           // 显示 LLM 对话    按钮
-    showHistory:        true,           // 显示 历史记录    按钮
-    showPeek:           true,           // 显示 Peek        按钮
-    showSettings:       true,           // 显示 设置        按钮
-
-    // --- 交互模式 ---
-    modelStorage:           true,       // 记录 ID (刷新后恢复)，可选 true(真), false(假)
-    modelRandMode:          'switch',   // 模型切换，可选 'rand'(随机), 'switch'(顺序)
-    modelTexturesRandMode:  'rand',     // 材质切换，可选 'rand'(随机), 'switch'(顺序)
-
-    // --- 提示消息选项 ---
-    showHitokoto:       true,           // 显示一言
-    showF12Status:      true,           // 显示加载状态
-    showF12Message:     true,           // 显示看板娘消息
-    showF12OpenMsg:     true,           // 显示控制台打开提示
-    showCopyMessage:    true,           // 显示 复制内容 提示
-    showWelcomeMessage: true,           // 显示进入面页欢迎词
-
-    // --- 看板娘样式 ---
-    waifuSize:              '280x250',  // 看板娘大小，例如 '280x250', '600x535'
-    waifuTipsSize:          '250x75',   // 提示框大小，例如 '250x70', '570x150'
-    waifuFontSize:          '12px',     // 提示框字体，例如 '12px', '30px'
-    waifuToolFont:          '14px',     // 工具栏字体，例如 '14px', '36px'
-    waifuToolLine:          '20px',     // 工具栏行高，例如 '20px', '36px'
-    waifuToolTop:           '-20px',    // 工具栏顶部边距，例如 '0px', '-60px'
-    waifuMinWidth:          'disable',  // 面页小于 指定宽度 隐藏看板娘，例如 'disable'(禁用), '768px'
-    waifuEdgeSide:          'left:0',   // 看板娘贴边方向，例如 'left:0'(靠左 0px), 'right:30'(靠右 30px)
-    waifuDraggable:         'disable',  // 拖拽样式，例如 'disable'(禁用), 'axis-x'(只能水平拖拽), 'unlimited'(自由拖拽)
-    waifuDraggableRevert:   true,       // 松开鼠标还原拖拽位置，可选 true(真), false(假)
-
-    // --- 杂项 ---
-    l2dVersion:             '1.4.3',                                    // 当前版本
-    l2dVerDate:             '2018.11.12',                               // 版本更新日期
-    homePageUrl:            'auto',                                     // 主页地址，可选 'auto'(自动), '{URL 网址}'
-    aboutPageUrl:           'https://www.fghrsh.net/post/123.html',     // 关于页地址, '{URL 网址}'
-    screenshotCaptureName:  'live2d.png',                               // 看板娘截图文件名，例如 'live2d.png'
-
-    // --- LLM & 后端设置 (原分散配置) ---
-    llmApiUrl:          'http://127.0.0.1:11434/v1/chat/completions',   // API
-    llmApiKey:          '',                                             // Key
-    pythonServerUrl:    'http://127.0.0.1:11542/',                      // Python Server
-
-    // --- 自动吐槽设置 ---
-    autoRoast:      false,          // 是否开启自动定时截图吐槽 (true: 开启, false: 关闭)
-    roastInterval:  60000,          // 自动吐槽间隔 (单位: 毫秒)，300000 = 5分钟
-
-    // --- LLM 功能详细配置 ---
-    modelNormal:        '',             // 普通对话模型
-    modelThinking:      '',             // 思考/识屏模型
-    useThinkingWaifu:   false,          // 闲聊是否使用思考模型
-    useThinkingChat:    true,           // 聊天助手是否使用思考模型
-    useThinkingRoast:   false,          // 吐槽是否使用思考模型
-    waifuPrompt: '你是一个网页看板娘，请用简短、可爱的语气回答，不要超过50个字。',
-    
-    // Peek 设置
-    targetType: 'fullscreen',
-    targetHwid: 0,
-    peekMode: 'roast',         // 'roast' or 'chat'
-    roastPrompt: `你是一个住在用户电脑桌面上的可爱看板娘。这是用户当前的屏幕截图。\n
-用户当前正在操作的窗口是：'/window_title'。\n
-背景里挂着的窗口还有：/window_list。\n\n
-请根据屏幕内容和窗口判断用户正在做什么，并以**女朋友或贴心助手**的口吻直接对用户说话（使用第二人称‘你’）。\n
-要求：\n
-1. 不要描述画面内容，直接开启话题。\n
-2. 这是一个猜测互动的过程。\n
-3. 语气要软萌、可爱、充满元气。\n
-4. 字数控制在50字以内。`,
-    chatPrompt: `你是一个智能聊天助手。当前窗口是 '/window_title'。\n
-请阅读图片中的聊天记录或文本内容，结合上下文，生成一个合适的、高情商的回复。\n
-请直接给出你此刻会发送的那一句话，你的回复应像真人在即时聊天中自然打出的内容，不要包含解释。`,
-    
-    // 记忆设置
-    useMemory: true,
-    memoryLimit: 10,
-
-    // --- 运行时状态 (不建议保存到本地，但初始化需要) ---
-    isLLMThinking: false,
-    isLLMWriting: false
-};
+const default_settings = JSON.parse(JSON.stringify(window.WAIFU_GLOBAL_DEFAULTS));
 
 // ==========================================
 //       2. 初始化配置 (加载本地存储)
 // ==========================================
 
-// 修复：替换字符串模板中的路径
 default_settings.defaultModel = default_settings.defaultModel.replace(/MODEL_HOME/g, default_settings.staticPath);
 
 // 初始化全局对象 (使用 Object 而不是 Array)
@@ -359,15 +256,6 @@ function initModel(waifuPath, type) {
     });
 
     function initSettingsPanel() {
-        // Tab 切换
-        $('.settings-tab-item').click(function() {
-            var tabId = $(this).data('tab');
-            $('.settings-tab-item').removeClass('active');
-            $(this).addClass('active');
-            $('.tab-pane').hide();
-            $('#tab-' + tabId).show();
-        });
-
         // 填充 UI (使用 live2d_settings)
         updateUIFromSettings();
 
@@ -1116,6 +1004,103 @@ function initModel(waifuPath, type) {
             $('.waifu-tool .fui-pause').hide(); // 隐藏停止按钮
         }
     }
+
+    // ==========================================
+    // [waifu-tips.js] 增强型模型数据导出器
+    // ==========================================
+    (function() {
+        console.log("[Bridge] 初始化调试桥接...");
+
+        var exportTimer = setInterval(function() {
+            // 1. 环境检查
+            if (typeof window.Live2DManager === 'undefined' || !window.Live2DManager.getModel(0)) {
+                return;
+            }
+            
+            var model = window.Live2DManager.getModel(0);
+            if (!model.modelSetting || !model.modelSetting.json) return;
+
+            // 2. 深度提取数据
+            try {
+                // --- A. 提取表情 (Expressions) ---
+                var expressions = model.expressions ? Object.keys(model.expressions) : [];
+
+                // --- B. 提取动作详细列表 (Motions) ---
+                // 目标结构: { "idle": ["Breath1.mtn", "Breath2.mtn"], "tap_body": [...] }
+                var motionDetail = {};
+                var rawMotions = model.modelSetting.json.motions; 
+                
+                if (rawMotions) {
+                    for (var group in rawMotions) {
+                        var fileList = rawMotions[group];
+                        // 仅提取文件名，方便展示
+                        motionDetail[group] = fileList.map(function(item) {
+                            // item.file 可能是 "motions/Breath1.mtn"
+                            return item.file;
+                        });
+                    }
+                }
+
+                // 3. 写入 LocalStorage
+                var debugInfo = {
+                    expressions: expressions,
+                    motions: motionDetail, // 注意：这里现在是一个对象，不是数组了
+                    modelId: live2d_settings.modelId || 0,
+                    timestamp: new Date().getTime()
+                };
+                
+                localStorage.setItem('waifu_debug_info', JSON.stringify(debugInfo));
+                
+                clearInterval(exportTimer);
+                setInterval(checkModelChange, 2000, model);
+                
+            } catch (e) {
+                console.error("[Bridge] 数据提取失败:", e);
+            }
+        }, 1000);
+
+        // 辅助：检测模型是否切换
+        var currentModelRef = null;
+        function checkModelChange(model) {
+            if (window.Live2DManager.getModel(0) !== currentModelRef) {
+                currentModelRef = window.Live2DManager.getModel(0);
+                // location.reload(); // 简单处理：模型变了刷新页面重新加载逻辑
+            }
+        }
+
+        // 4. 监听指令 (跨窗口)
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'waifu_debug_command' && e.newValue) {
+                var cmd = JSON.parse(e.newValue);
+                executeDebugCommand(cmd);
+            }
+        });
+    })();
+
+    // --- 通用执行函数 (核心修改：支持指定 Index) ---
+    window.executeDebugCommand = function(cmd) {
+        var model = window.Live2DManager.getModel(0);
+        if (!model) return;
+
+        console.log("[Bridge] 执行指令:", cmd);
+
+        if (cmd.type === 'expression') {
+            model.setExpression(cmd.name);
+            showMessage("调试表情: " + cmd.name, 1000, true);
+        } 
+        else if (cmd.type === 'motion') {
+            // 如果指令里带了 index，就播放特定的文件
+            if (cmd.index !== undefined) {
+                // startMotion(组名, 索引, 优先级)
+                // 优先级 3 (PRIORITY_NORMAL) 或 4 (PRIORITY_FORCE)
+                model.startMotion(cmd.name, cmd.index, 3);
+                showMessage("调试动作: " + cmd.filename, 1000, true);
+            } else {
+                // 旧逻辑兼容：随机播放
+                model.startRandomMotion(cmd.name, 3);
+            }
+        }
+    };
 }
 
 function loadModel(modelId, modelTexturesId=0) {

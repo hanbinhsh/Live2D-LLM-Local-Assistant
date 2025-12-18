@@ -821,6 +821,7 @@ function(t) {
 		k = 0,
 		V = 0,
 		X = .5;
+	window.Live2DManager = R; ////////////////////////////////////  NEW  /  表情管理  /////////////////////////////////////////
 	window.loadlive2d = L
 }, function(t, i, e) {
 	"use strict";

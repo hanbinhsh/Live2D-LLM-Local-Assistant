@@ -4,6 +4,7 @@
     <div class="settings-tab-item" data-tab="style">样式</div>
     <div class="settings-tab-item" data-tab="toolbar">工具栏</div>
     <div class="settings-tab-item" data-tab="llm">LLM设置</div>
+    <div class="settings-tab-item" data-tab="debug">模型调试</div>
 </div>
 <div class="settings-content">
     <!-- Tab 1: 常规设置 (接口、提示消息、杂项) -->
@@ -115,6 +116,7 @@
             <label><input data-key="showSettings" class="config-item" type="checkbox"> 设置面板 (齿轮)</label>
         </div>
     </div>
+    <!-- Tab 4: LLM 设置 -->
     <div id="tab-llm" class="tab-pane" style="display:none;">
         <div class="setting-section-title">核心接口配置</div>
         <div class="setting-group">
@@ -227,6 +229,23 @@
             <textarea id="prompt-chat" data-key="chatPrompt" class="waifu-textarea config-item"></textarea>
         </div>
     </div>
+    <!-- Tab 5: 模型调试 -->
+    <div id="tab-debug" class="tab-pane" style="display:none;">
+        <div class="setting-section-title">模型调试 (Debug)</div>
+        <div class="setting-group">
+            <label class="setting-label">表情 (Expression)</label>
+            <select id="debug-expression-select" class="waifu-select config-item">
+                <option value="">加载中...</option>
+            </select>
+        </div>
+        <div class="setting-group">
+            <label class="setting-label">动作 (Motion)</label>
+            <select id="debug-motion-select" class="waifu-select config-item">
+                <option value="">加载中...</option>
+            </select>
+            <button id="btn-play-motion" class="waifu-btn secondary" style="margin-left:5px;">播放</button>
+        </div>
+    </div>  
     <!-- 底部保存提示 -->
     <div style="text-align:center; padding:10px; color:#888; font-size:12px; border-top:1px solid #eee; background:#fafafa;">
         部分设置刷新网页后生效
@@ -234,6 +253,15 @@
 </div>
 
 <script>
+
+    // --- Tab 切换 ---
+    $('.settings-tab-item').click(function() {
+        $('.settings-tab-item').removeClass('active');
+        $(this).addClass('active');
+        $('.tab-pane').hide();
+        $('#tab-' + $(this).data('tab')).show();
+    });
+
     $('#btn-export-history').click(function() {
         // 1. 获取数据
         var historyStr = localStorage.getItem('waifu_chat_history');
@@ -305,4 +333,99 @@
         // 读取文件
         reader.readAsText(file);
     });
+
+    // ==========================================
+    // [settings-content.html] 模型调试 UI (消费者)
+    // ==========================================
+    if (document.getElementById('debug-motion-select')) {
+        var lastExportTime = 0;
+
+        function refreshDebugUI() {
+            var infoStr = localStorage.getItem('waifu_debug_info');
+            if (!infoStr) return;
+
+            var info = JSON.parse(infoStr);
+            if (info.timestamp <= lastExportTime) return;
+            
+            console.log("[Debug] 正在刷新动作列表...");
+            lastExportTime = info.timestamp;
+
+            // 1. 填充表情 (保持不变)
+            var $expr = $('#debug-expression-select');
+            var oldExpr = $expr.val();
+            $expr.empty().append('<option value="">选择表情...</option>');
+            if(Array.isArray(info.expressions)){
+                info.expressions.forEach(name => $expr.append(`<option value="${name}">${name}</option>`));
+            }
+            $expr.val(oldExpr);
+
+            // 2. 填充动作 (核心修改：支持二级结构)
+            var $motion = $('#debug-motion-select');
+            var oldMotion = $motion.val();
+            $motion.empty().append('<option value="">选择具体的动作文件...</option>');
+            
+            // info.motions 现在是 { "idle": ["file1", "file2"], "tap": [...] }
+            if (info.motions && typeof info.motions === 'object') {
+                Object.keys(info.motions).forEach(function(groupName) {
+                    var fileList = info.motions[groupName];
+                    
+                    // 创建分组标签
+                    var $group = $(`<optgroup label="${groupName}"></optgroup>`);
+                    
+                    // 遍历该组下的所有文件
+                    fileList.forEach(function(filename, index) {
+                        // value 格式： "groupName:index" (例如 "idle:0")
+                        // 显示文本： "[0] Breath1.mtn"
+                        var cleanName = filename.split('/').pop(); // 去掉路径，只留文件名
+                        $group.append(`<option value="${groupName}:${index}" data-filename="${cleanName}">[${index}] ${cleanName}</option>`);
+                    });
+                    
+                    $motion.append($group);
+                });
+            }
+            $motion.val(oldMotion);
+        }
+
+        // 轮询
+        setInterval(refreshDebugUI, 2000);
+        refreshDebugUI();
+
+        // --- 事件绑定 ---
+
+        $('#debug-expression-select').off('change').on('change', function() {
+            var name = $(this).val();
+            if (!name) return;
+            var cmd = { type: 'expression', name: name, id: Date.now() };
+            sendCommand(cmd);
+        });
+
+        // 播放动作 (修改：解析 value 中的 group:index)
+        $('#btn-play-motion').off('click').on('click', function() {
+            var rawVal = $('#debug-motion-select').val(); // "idle:0"
+            if (!rawVal) return;
+
+            var parts = rawVal.split(':');
+            var groupName = parts[0];
+            var index = parseInt(parts[1]);
+            var filename = $('#debug-motion-select option:selected').text();
+
+            var cmd = { 
+                type: 'motion', 
+                name: groupName, 
+                index: index, 
+                filename: filename,
+                id: Date.now() 
+            };
+            sendCommand(cmd);
+        });
+
+        // 统一发送函数
+        function sendCommand(cmd) {
+            if (typeof window.executeDebugCommand === 'function' && typeof window.Live2DManager !== 'undefined') {
+                window.executeDebugCommand(cmd);
+            } else {
+                localStorage.setItem('waifu_debug_command', JSON.stringify(cmd));
+            }
+        }
+    }
 </script>

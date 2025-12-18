@@ -45,6 +45,20 @@
 			{"file":"motions/Touch4.mtn"},
 			{"file":"motions/Touch5.mtn"},
 			{"file":"motions/Touch6.mtn"}
+		],
+		"idle_dare":[
+			{"file":"motions/Breath Dere1.mtn"},
+			{"file":"motions/Breath Dere2.mtn"},
+			{"file":"motions/Breath Dere3.mtn"}
+		],
+		"wake_up":[
+			{"file":"motions/WakeUp.mtn"}
+		],
+		"reaction_fail":[
+			{"file":"motions/Fail.mtn"}
+		],
+		"reaction_success":[
+			{"file":"motions/Success.mtn"}
 		]
 	}
 }

@@ -1,0 +1,4 @@
+将runserver快捷方式放入Windows启动目录中
+http://127.0.0.1:10452/live2d.html
+
+调试请关闭网页缓存，在f12网络页面下

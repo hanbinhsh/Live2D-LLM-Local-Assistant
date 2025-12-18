@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>看板娘控制台 - 设置中心</title>
+    <script src="assets/waifu-config.js"></script>
     <script src="assets/jquery.min.js?v=3.3.1"></script>
     <!-- 复用部分原有样式 -->
     <link rel="stylesheet" type="text/css" href="assets/waifu.css?v=1.4.2"/>
@@ -263,58 +264,9 @@
         });
 
         function initSettingsLogic() {
-            // --- 1. Tab 切换逻辑 ---
-            $('.settings-tab-item').click(function() {
-                $('.settings-tab-item').removeClass('active');
-                $(this).addClass('active');
-                $('.tab-pane').hide();
-                $('#tab-' + $(this).data('tab')).show();
-            });
-
             // --- 2. 定义默认配置 (包含 Global 和 LLM 的所有默认值) ---
             // 确保这些 Key 与 JS 文件中的 default_settings 一致
-            var defaultSettings = {
-                // 常规
-                'waifuSize': '280x250',
-                'waifuTipsSize': '250x75',
-                'waifuFontSize': '12px',
-                'waifuToolFont': '14px',
-                'waifuToolLine': '20px',
-                'waifuToolTop': '-20px',
-                'waifuDraggable': 'disable',
-                'waifuDraggableRevert': true,
-                'hitokotoAPI': 'hitokoto.cn',
-                'showHitokoto': true,
-                'showToolMenu': true,
-                'modelRandMode': 'switch',
-                'modelTexturesRandMode': 'rand',
-                'showLLM': true,
-                'showHistory': true,
-                'showPeek': true,
-                'showSettings': true,
-                
-                // LLM & AI
-                'llmApiUrl': 'http://127.0.0.1:11434/v1/chat/completions',
-                'pythonServerUrl': 'http://127.0.0.1:11542/',
-                'roastInterval': 60000,
-                'peekMode': 'roast',
-                'targetType': 'fullscreen',
-                'useMemory': true,
-                'memoryLimit': 10,
-                'waifuPrompt': '你是一个网页看板娘，请用简短、可爱的语气回答，不要超过50个字。',
-                'roastPrompt': `你是一个住在用户电脑桌面上的可爱看板娘。这是用户当前的屏幕截图。\n
-用户当前正在操作的窗口是：'/window_title'。\n
-背景里挂着的窗口还有：/window_list。\n\n
-请根据屏幕内容和窗口判断用户正在做什么，并以**女朋友或贴心助手**的口吻直接对用户说话（使用第二人称‘你’）。\n
-要求：\n
-1. 不要描述画面内容，直接开启话题。\n
-2. 这是一个猜测互动的过程。\n
-3. 语气要软萌、可爱、充满元气。\n
-4. 字数控制在50字以内。`,
-                'chatPrompt': `你是一个智能聊天助手。当前窗口是 '/window_title'。\n
-请阅读图片中的聊天记录或文本内容，结合上下文，生成一个合适的、高情商的回复。\n
-请直接给出你此刻会发送的那一句话，你的回复应像真人在即时聊天中自然打出的内容，不要包含解释。`
-            };
+            var defaultSettings = JSON.parse(JSON.stringify(window.WAIFU_GLOBAL_DEFAULTS));
 
             // --- 3. 读取并填充设置 (统一逻辑) ---
             function loadSettings() {
