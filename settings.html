@@ -112,7 +112,7 @@
             align-items: center;
             /* 如果标签内有按钮，让它们两端对齐或保持间距 */
             gap: 8px; 
-            padding-right: 15px;
+            /* padding-right: 15px; */
         }
 
         /* 输入框与下拉框统一 */
@@ -220,6 +220,23 @@
             margin-bottom: 8px;
         }
         .prompt-group textarea {
+            width: 100%;
+            max-width: 100%;
+            height: 100px;
+            resize: vertical;
+        }
+
+        .mtn-group {
+            display: block;
+            margin-bottom: 20px;
+        }
+        .mtn-group .setting-label {
+            width: 100% !important;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .mtn-group textarea {
             width: 100%;
             max-width: 100%;
             height: 100px;

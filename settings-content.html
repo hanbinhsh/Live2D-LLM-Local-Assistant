@@ -245,6 +245,23 @@
             </select>
             <button id="btn-play-motion" class="waifu-btn secondary" style="margin-left:5px;">播放</button>
         </div>
+        <hr style="border:0; border-top:1px dashed #ddd; margin:15px 0;">
+        <div class="setting-section-title">高级动作调试</div>
+        <div class="setting-group mtn-group">
+            <label class="setting-label">
+                输入 .mtn 文件内容
+                <button id="btn-play-raw" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">执行动作</button>
+            </label>
+            <textarea id="debug-raw-mtn" class="waifu-textarea config-item" placeholder="# Live2D Animator Motion Data..."></textarea>
+        </div>
+
+        <!-- <div class="setting-group prompt-group" id="group-prompt-chat" style="display:none;margin-top:10px;">
+            <label class="setting-label">
+                助手提示词
+                <button id="btn-reset-chat" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">重置</button>
+            </label>
+            <textarea id="prompt-chat" data-key="chatPrompt" class="waifu-textarea config-item"></textarea>
+        </div> -->
     </div>  
     <!-- 底部保存提示 -->
     <div style="text-align:center; padding:10px; color:#888; font-size:12px; border-top:1px solid #eee; background:#fafafa;">
@@ -428,4 +445,25 @@
             }
         }
     }
+
+    $('#btn-play-raw').off('click').on('click', function() {
+        var rawData = $('#debug-raw-mtn').val();
+        if (!rawData || rawData.trim() === "") {
+            alert("请先输入 motion 数据");
+            return;
+        }
+
+        var cmd = { 
+            type: 'raw_motion', 
+            data: rawData, 
+            id: Date.now() 
+        };
+
+        // 发送指令 (兼容同窗口和跨窗口)
+        if (typeof window.executeDebugCommand === 'function' && typeof window.Live2DManager !== 'undefined') {
+            window.executeDebugCommand(cmd);
+        } else {
+            localStorage.setItem('waifu_debug_command', JSON.stringify(cmd));
+        }
+    });
 </script>

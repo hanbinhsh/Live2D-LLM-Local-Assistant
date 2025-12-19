@@ -1105,22 +1105,55 @@ function initModel(waifuPath, type) {
         var model = window.Live2DManager.getModel(0);
         if (!model) return;
 
-        console.log("[Bridge] 执行指令:", cmd);
+        console.log("[Bridge] 执行指令:", cmd.type);
 
         if (cmd.type === 'expression') {
             model.setExpression(cmd.name);
             showMessage("调试表情: " + cmd.name, 1000, true);
         } 
         else if (cmd.type === 'motion') {
-            // 如果指令里带了 index，就播放特定的文件
             if (cmd.index !== undefined) {
-                // startMotion(组名, 索引, 优先级)
-                // 优先级 3 (PRIORITY_NORMAL) 或 4 (PRIORITY_FORCE)
                 model.startMotion(cmd.name, cmd.index, 3);
                 showMessage("调试动作: " + cmd.filename, 1000, true);
             } else {
-                // 旧逻辑兼容：随机播放
                 model.startRandomMotion(cmd.name, 3);
+            }
+        }
+        // ==========================================
+        // 处理 Raw Motion 数据
+        // ==========================================
+        else if (cmd.type === 'raw_motion') {
+            try {
+                var rawData = cmd.data;
+                
+                // 1. 字符串转 ArrayBuffer
+                // .mtn 文件通常是 ASCII/UTF-8 文本，直接按字节转换即可
+                var buf = new ArrayBuffer(rawData.length);
+                var bufView = new Uint8Array(buf);
+                for (var i = 0, strLen = rawData.length; i < strLen; i++) {
+                    bufView[i] = rawData.charCodeAt(i);
+                }
+
+                // 2. 调用 Live2D 内部的加载器
+                // Live2DMotion 是 live2d.js 暴露的全局类
+                var motion = Live2DMotion.loadMotion(buf);
+                
+                // 3. 设置淡入淡出 (可选，防止闪烁)
+                // 你也可以解析 rawData 里的 $fadein=... 手动设置，但 loadMotion 通常会自动解析
+                // motion.setFadeIn(100);
+                // motion.setFadeOut(100);
+
+                // 4. 强制播放
+                // 优先级 3 (PRIORITY_NORMAL) 或 4 (PRIORITY_FORCE)
+                // model.mainMotionManager 是动作管理器
+                model.mainMotionManager.startMotionPrio(motion, 3);
+                
+                showMessage("正在执行自定义动作...", 1000, true);
+                console.log("[Bridge] Raw Motion 播放成功");
+
+            } catch (e) {
+                console.error("[Bridge] Raw Motion 执行失败:", e);
+                alert("动作数据解析失败，请检查格式。\n" + e.message);
             }
         }
     };
