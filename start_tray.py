@@ -580,7 +580,7 @@ def run_tray():
             MenuItem("显示/隐藏桌面挂件", toggle_webview, checked=is_webview_running),
             MenuItem("窗口置顶", toggle_widget_top, checked=is_widget_top),
             MenuItem("解锁位置", toggle_widget_drag, checked=is_widget_drag),
-            MenuItem("显示边界框", toggle_widget_border, checked=is_widget_border),
+            # MenuItem("显示边界框", toggle_widget_border, checked=is_widget_border),
             MenuItem("点击穿透", toggle_widget_click_through, checked=is_click_through),
             
             # --- 两个设置入口 ---
@@ -624,7 +624,7 @@ if __name__ == "__main__":
     http_proc = start_http()
     start_server()
 
-    # --- 修改部分：根据配置决定是否启动看板娘 ---
+    # --- 根据配置决定是否启动看板娘 ---
     import config_manager
     cfg = config_manager.load_config()
     

@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+requests
+pystray
+Pillow
+pyperclip
+pywin32
+PyQt5
+PyQtWebEngine

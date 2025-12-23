@@ -14,4 +14,4 @@ python_server/__pycache__/
 
 .vscode/
 
-widget_config.json
+runtime/

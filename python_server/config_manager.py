@@ -1,7 +1,22 @@
 import json
 import os
 
-CONFIG_FILE = "widget_config.json"
+# 1. 获取当前脚本所在目录 (即 python_server/)
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 2. 计算 storage 目录 (python_server 的上一级 -> storage)
+STORAGE_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "storage"))
+
+# 3. 定义配置文件全路径
+CONFIG_FILE = os.path.join(STORAGE_DIR, "widget_config.json")
+
+# 4. 确保 storage 目录存在 (防止首次运行报错)
+if not os.path.exists(STORAGE_DIR):
+    try:
+        os.makedirs(STORAGE_DIR)
+        print(f"[Config] Created storage directory: {STORAGE_DIR}")
+    except Exception as e:
+        print(f"[Config] Failed to create storage directory: {e}")
 
 DEFAULT_CONFIG = {
     "x": -1,
@@ -11,6 +26,8 @@ DEFAULT_CONFIG = {
     "top": True,
     "draggable": False,
     "show_widget": True,
+    "auto_start": False,    # 开机自启
+    "use_d3d9": False,    # 兼容模式 (D3D9)
 
     "opacity": 1.0,         # 透明度 (0.1 ~ 1.0)
     "click_through": False, # 点击穿透 (鼠标穿过窗口)

@@ -1,9 +1,12 @@
 import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import socket
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QSpinBox, QCheckBox, QGroupBox, QPushButton, QMessageBox, QDoubleSpinBox)
 from PyQt5.QtCore import Qt
 import config_manager
+import startup_manager
 
 CMD_PORT = 10453
 
@@ -11,7 +14,7 @@ class SettingsWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("桌面挂件设置")
-        self.resize(380, 450) # 调高一点以容纳新选项
+        self.resize(380, 450)
         
         self.cfg = config_manager.load_config()
         self.init_ui()
@@ -41,6 +44,27 @@ class SettingsWindow(QWidget):
         
         group_opt.setLayout(layout_opt)
         layout.addWidget(group_opt)
+
+        # --- 1. 系统设置 ---
+        group_sys = QGroupBox("系统与兼容性")
+        layout_sys = QVBoxLayout()
+
+        # 开机自启
+        self.chk_startup = QCheckBox("开机自动启动")
+        # 优先读取快捷方式是否存在，以保证状态真实
+        self.chk_startup.setChecked(startup_manager.is_startup_enabled())
+        self.chk_startup.toggled.connect(self.on_startup_change)
+        layout_sys.addWidget(self.chk_startup)
+
+        # 兼容模式 (D3D9)
+        self.chk_d3d9 = QCheckBox("兼容模式 (解决闪烁/闪退)")
+        self.chk_d3d9.setToolTip("开启后使用 D3D9 渲染。如果遇到闪烁或闪退请勾选此项。\n修改后需要重启程序生效。")
+        self.chk_d3d9.setChecked(self.cfg.get("use_d3d9", False))
+        self.chk_d3d9.toggled.connect(self.on_d3d9_change)
+        layout_sys.addWidget(self.chk_d3d9)
+
+        group_sys.setLayout(layout_sys)
+        layout.addWidget(group_sys)
 
         # --- 2. 尺寸位置 ---
         group_geo = QGroupBox("位置与大小")
@@ -130,6 +154,20 @@ class SettingsWindow(QWidget):
         self.spin_track_threshold.setValue(self.cfg.get("track_threshold", 10))
         self.dspin_idle_timeout.setValue(self.cfg.get("idle_timeout", 2.0))
         self.blockSignals(False)
+
+    def on_startup_change(self, checked):
+        success = startup_manager.set_startup(checked)
+        if success:
+            config_manager.save_config({"auto_start": checked})
+        else:
+            self.blockSignals(True)
+            self.chk_startup.setChecked(not checked)
+            self.blockSignals(False)
+            QMessageBox.warning(self, "错误", "设置开机自启失败，请检查安全软件拦截。")
+
+    def on_d3d9_change(self, checked):
+        config_manager.save_config({"use_d3d9": checked})
+        QMessageBox.information(self, "提示", "兼容模式设置已保存。\n请完全退出并重启程序以生效。")
 
     def reset_to_default(self):
         reply = QMessageBox.question(self, '重置确认', 

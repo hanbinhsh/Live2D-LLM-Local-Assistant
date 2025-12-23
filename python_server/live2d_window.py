@@ -1,5 +1,6 @@
 import sys
 import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import socket
 import json
 import time
@@ -324,6 +325,18 @@ class TransparentLive2DWindow(QMainWindow):
             config_manager.save_config({"x": self.x(), "y": self.y()})
 
 if __name__ == "__main__":
+    cfg = config_manager.load_config()
+    use_d3d9 = cfg.get("use_d3d9", False)
+
+    if use_d3d9:
+        print("[Boot] Compatibility Mode: ON (ANGLE + D3D9)")
+        os.environ["QT_OPENGL"] = "angle"
+        os.environ["QT_ANGLE_PLATFORM"] = "d3d9"
+    else:
+        print("[Boot] Compatibility Mode: OFF (Default)")
+        if "QT_OPENGL" in os.environ: del os.environ["QT_OPENGL"]
+        if "QT_ANGLE_PLATFORM" in os.environ: del os.environ["QT_ANGLE_PLATFORM"]
+
     if REMOTE_DEBUG_PORT:
         os.environ["QTWEBENGINE_REMOTE_DEBUGGING"] = REMOTE_DEBUG_PORT
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)

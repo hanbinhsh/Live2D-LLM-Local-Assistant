@@ -1,9 +1,20 @@
-将runserver快捷方式放入Windows启动目录中
-http://127.0.0.1:10452/live2d.html
+本地浏览器访问看板娘：http://127.0.0.1:10452/live2d.html
 
 调试请关闭网页缓存，在f12网络页面下
+
+运行
+运行boot.vbs
+
+存在Python环境？
+安装requirements并运行boot_lr.vbs
+如果你需要使用本地python环境，开机自启请勿在软件内设置，而是将boot_lr.vbs快捷方式放入Windows启动目录中
 
 添加模型：
 1. 将模型拖入live2d_api-master/model
 2. 修改model_list.json
 3. 运行gene-config-file.py
+
+安装依赖（内置Python环境）
+set PYTHONPATH=
+set PYTHONHOME=
+runtime\python.exe -I -m pip install -r requirements.txt
