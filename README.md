@@ -59,18 +59,12 @@
 
 打开终端 (CMD/PowerShell) 运行以下命令拉取模型：
 
-*   **推荐（速度快/效果好）：**
+*   **推荐（速度快/效果好）**
     ```bash
-    ollama pull qwen2.5:3b
+    ollama run qwen3-vl:2b-instruct
     # 或者
-    ollama pull qwen2.5:7b
+    ollama run qwen3-vl:8b-instruct
     ```
-*   **如果需要视觉功能 (Peek/识图)：**
-    ```bash
-    ollama pull llava
-    # 或者使用支持多模态的 qwen3-vl
-    ```
-
 ### 3. 软件内配置
 启动看板娘后，在设置面板 -> **LLM设置** 中：
 *   **API 地址**：默认为 `http://127.0.0.1:11434/v1/chat/completions`
