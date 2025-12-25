@@ -1,5 +1,6 @@
 import base64
 import io
+import re
 import win32gui
 import win32con
 import ctypes
@@ -13,9 +14,18 @@ import pyperclip
 import uuid
 import datetime
 from fastapi.staticfiles import StaticFiles
+from activity_tracker import tracker
 import json
 
 app = FastAPI()
+
+@app.on_event("startup")
+def startup_event():
+    tracker.start_recording()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    tracker.stop_recording()
 
 app.add_middleware(
     CORSMiddleware,
@@ -322,6 +332,157 @@ async def export_history_to_file(req: dict):
         return {"success": True, "path": filepath}
     except Exception as e:
         return {"success": False, "error": str(e)}
+    
+# 1. 报告配置开关
+@app.post("/report/config")
+def set_report_config(req: dict):
+    # req: {"enabled": bool, "prompt": str}
+    tracker.config.update(req)
+    return {"success": True}
+
+# 2. 数据查看
+@app.get("/report/data")
+def get_report_data(page: int = 1, size: int = 20, search: str = ""):
+    return tracker.get_data_grid(page, size, search)
+
+@app.post("/report/clear")
+def clear_report_data():
+    tracker.clear_data()
+    return {"success": True}
+
+# 3. 获取 HTML 列表
+@app.get("/report/list")
+def list_reports():
+    html_dir = tracker.HTML_DIR # 访问 tracker 里定义的路径
+    files = []
+    if os.path.exists(html_dir):
+        files = [f for f in os.listdir(html_dir) if f.endswith(".html")]
+        files.sort(reverse=True) # 最新在前
+    return {"files": files}
+
+# 4. 生成报告 (核心)
+@app.post("/report/generate")
+def generate_report_llm(req: dict):
+    # req: { "model": str, "type": "daily/weekly/sql", "sql": str, "chat_history": list/str, "prompt_template": str }
+    
+    # 1. 获取活动数据 (Database)
+    db_result = tracker.execute_query_for_report(req.get("type"), req.get("sql"))
+    if not db_result["success"]:
+        return {"success": False, "reply": f"数据库查询错误: {db_result['error']}"}
+    
+    # 2. 获取聊天记录 (Chat History)
+    # 前端传来的可能是 JSON 字符串，也可能是 List，统一转为 List
+    raw_history = req.get("chat_history", [])
+    if isinstance(raw_history, str):
+        try:
+            chat_list = json.loads(raw_history)
+        except:
+            chat_list = [raw_history]
+    else:
+        chat_list = raw_history
+
+    # 3. 获取并预处理提示词模板
+    user_prompt = req.get("prompt_template")
+    if not user_prompt or not user_prompt.strip():
+        # 默认模板 (如果用户没填)
+        user_prompt = """
+        你是一个贴心的桌面看板娘。请根据以下信息生成一份HTML日报/周报。
+        
+        【用户活动数据】:
+        /data:50
+        
+        【近期聊天话题】:
+        /chat_context:10
+        
+        要求：
+        1. 返回纯 HTML 代码，不要包含 Markdown 标记（如 ```html）。
+        2. 必须包含 CSS 样式，界面要现代、可爱、二次元风格（粉色/淡蓝色调）。
+        3. 总结用户的活动（工作了多久，玩了多久）。
+        4. 结合聊天记录，给出一份“用户画像”或“心情分析”。
+        5. 【重要】如果可以，请在 HTML 中嵌入简单的 Chart.js 或 ECharts 代码来可视化数据（如饼图、雷达图或条形图）。
+        """
+
+    # === 4. 占位符解析与替换逻辑 (核心) ===
+    
+    # 辅助函数：格式化活动数据
+    def format_activity(limit):
+        lines = [f"Columns: {db_result['columns']}"]
+        # 取前 N 行
+        data_slice = db_result["data"][:limit]
+        for row in data_slice:
+            lines.append(str(row))
+        return "\n".join(lines)
+
+    # 辅助函数：格式化聊天记录
+    def format_chat(limit):
+        # 取后 N 条 (最近的记录)
+        chat_slice = chat_list[-limit:] if limit > 0 else []
+        lines = []
+        for msg in chat_slice:
+            # 兼容对象或字符串
+            if isinstance(msg, dict):
+                role = msg.get("role", "unknown")
+                content = msg.get("content", "")
+                # 简单处理多模态内容
+                if isinstance(content, list): content = "[图片/多模态内容]"
+                lines.append(f"{role}: {content}")
+            else:
+                lines.append(str(msg))
+        return "\n".join(lines)
+
+    # 正则替换逻辑
+    # 匹配 /data 或 /data:数字
+    def replace_data_tag(match):
+        # 获取冒号后面的数字，如果没写默认 50
+        count = int(match.group(1)) if match.group(1) else 50
+        return format_activity(count)
+
+    # 匹配 /chat_context 或 /chat_context:数字
+    def replace_chat_tag(match):
+        # 获取冒号后面的数字，如果没写默认 20
+        count = int(match.group(1)) if match.group(1) else 20
+        return format_chat(count)
+
+    # 开始替换
+    final_prompt = re.sub(r"/data(?::(\d+))?", replace_data_tag, user_prompt)
+    final_prompt = re.sub(r"/chat_context(?::(\d+))?", replace_chat_tag, final_prompt)
+
+    # === 5. 兜底逻辑 ===
+    # 如果用户自己写了 Prompt 但完全忘记加占位符，为了防止数据丢失，强制追加在末尾
+    if "/data" not in user_prompt:
+        final_prompt += "\n\n【补充数据】:\n" + format_activity(30)
+    if "/chat_context" not in user_prompt:
+        final_prompt += "\n\n【补充聊天】:\n" + format_chat(10)
+
+    # 6. 调用 LLM
+    try:
+        payload = {
+            "model": req.get("model"),
+            "prompt": final_prompt,
+            "stream": False,
+            "options": {"num_ctx": 8192} # 增加上下文窗口以容纳更多数据
+        }
+        
+        print("[Report] Prompt Constructed. Requesting LLM...")
+        response = requests.post(OLLAMA_API, json=payload)
+        result = response.json()
+        
+        if "error" in result:
+            return {"success": False, "reply": f"Ollama Error: {result['error']}"}
+
+        llm_reply = result.get("response", "")
+        # 清洗 Markdown
+        html_content = llm_reply.replace("```html", "").replace("```", "").strip()
+        
+        # 保存
+        file_path = tracker.save_html_report(html_content)
+        filename = os.path.basename(file_path)
+        
+        return {"success": True, "filename": filename, "reply": "报告生成完毕！"}
+        
+    except Exception as e:
+        print(f"[Report Error] {e}")
+        return {"success": False, "reply": f"后端处理失败: {e}"}
 
 if __name__ == "__main__":
     import uvicorn

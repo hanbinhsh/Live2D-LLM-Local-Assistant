@@ -7,3 +7,4 @@ pyperclip
 pywin32
 PyQt5
 PyQtWebEngine
+psutil

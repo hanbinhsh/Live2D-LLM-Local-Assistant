@@ -100,5 +100,22 @@ window.WAIFU_GLOBAL_DEFAULTS = {
 
     // --- 运行时状态 (不建议保存到本地，但初始化需要) ---
     isLLMThinking: false,
-    isLLMWriting: false
+    isLLMWriting: false,
+
+    // 报告
+    reportEnabled: true,                // 默认开启后台记录
+    reportPrompt: `你是一个贴心的桌面看板娘。请根据以下信息生成一份HTML日报/周报。
+
+【用户活动数据】:
+/data:50
+
+【近期聊天话题】:
+/chat_context:10
+
+要求：
+1. 返回纯 HTML 代码，不要包含 Markdown 标记（如 \`\`\`html）。
+2. 必须包含 CSS 样式，界面要现代、可爱、二次元风格（粉色/淡蓝色调）。
+3. 总结用户的活动（工作了多久，玩了多久）。
+4. 结合聊天记录，给出一份“用户画像”或“心情分析”。
+5. 【重要】如果可以，请在 HTML 中嵌入简单的 Chart.js 或 ECharts 代码来可视化数据（如饼图、雷达图或条形图）。`,
 };
