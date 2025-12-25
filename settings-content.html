@@ -136,7 +136,7 @@
         <div class="setting-group">
             <label class="setting-label">
                 普通模型 (响应快)
-                <button id="btn-refresh-models" class="waifu-btn secondary" style="padding:1px 5px;font-size:10px;float:right;">刷新列表</button>
+                <button id="" class="waifu-btn secondary btn-refresh-models" style="padding:1px 5px;font-size:10px;float:right;">刷新列表</button>
             </label>
             <select id="model-normal" data-key="modelNormal" class="waifu-select config-item">
                 <option value="">点击刷新...</option>
@@ -243,22 +243,39 @@
         <div class="setting-section-title">报告生成与配置</div>
         
         <!-- 1. 功能开关与配置 -->
-        <div class="setting-group checkbox-group">
-            <label><input id="report-enabled" type="checkbox" checked> 开启后台活动记录</label>
+        <div class="setting-group">
+            <label class="setting-label" style="color:#666;">
+                后台活动记录开关
+            </label>
+            <div style="font-size:12px; color:#999; padding:5px 0;">
+                请在托盘菜单的 "窗口及性能配置" 面板中进行设置。
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <label class="setting-label">
+                报告生成模型
+                <button id="" class="waifu-btn secondary btn-refresh-models" style="float:right;padding:1px 5px;font-size:10px;">刷新列表</button>
+            </label>
+            <select id="model-report" data-key="modelReport" class="waifu-select config-item">
+                <option value="">点击刷新...</option>
+            </select>
         </div>
         
+        <!-- 2. 提示词设置 -->
         <div class="setting-group mtn-group">
             <label class="setting-label">
-                自定义提示词 (Template)
+                自定义提示词
                 <span style="font-size:10px; color:#888; font-weight:normal;">
                     支持占位符: <code style="background:#eee;">/data:50</code> (插入50条活动数据), 
                     <code style="background:#eee;">/chat_context:20</code> (插入20条对话)
                 </span>
+                <button id="btn-reset-report-prompt" class="waifu-btn secondary">重置默认</button>
             </label>
-            <textarea id="report-prompt" class="waifu-textarea config-item"></textarea>
+            <textarea id="report-prompt" data-key="reportPrompt" class="waifu-textarea config-item"></textarea>
         </div>
         
-        <!-- 2. 生成操作区 -->
+        <!-- 3. 生成操作区 -->
         <div class="setting-group" style="display:flex; gap:5px; margin-top:10px;">
             <select id="report-type" class="waifu-select" style="flex:1;">
                 <option value="daily">生成今日日报</option>
@@ -273,7 +290,7 @@
             <textarea id="report-sql" class="waifu-textarea" style="font-family:monospace; color:#2c3e50;" placeholder="SELECT app_name, SUM(duration) FROM activities GROUP BY app_name"></textarea>
         </div>
         
-        <!-- 3. 历史报告列表 -->
+        <!-- 4. 历史报告列表 -->
         <div class="setting-section-title" style="margin-top:15px;">
             历史报告 
             <button id="btn-refresh-reports" class="waifu-btn secondary" style="float:right; font-size:10px;">刷新</button>
@@ -282,7 +299,7 @@
             <!-- JS 填充 -->
         </ul>
 
-        <!-- 4. 原始数据管理 -->
+        <!-- 5. 原始数据管理 -->
         <hr style="border:0; border-top:1px dashed #ddd; margin:15px 0;">
         <div class="setting-section-title">
             原始数据管理
@@ -311,9 +328,9 @@
             </table>
         </div>
         <div style="text-align:center; margin-top:5px;">
-            <button id="btn-prev-page" class="waifu-btn secondary">上一页</button>
-            <span id="page-info" style="font-size:12px; margin:0 5px;">1 / 1</span>
-            <button id="btn-next-page" class="waifu-btn secondary">下一页</button>
+            <button id="btn-prev-page" class="waifu-btn secondary" style="padding:2px 8px;">&lt;</button>
+            <span id="page-info" style="font-size:12px; margin:0 10px; color:#666;">1 / 1</span>
+            <button id="btn-next-page" class="waifu-btn secondary" style="padding:2px 8px;">&gt;</button>
         </div>
     </div>
     <!-- Tab 6: 模型调试 -->
@@ -349,7 +366,6 @@
 </div>
 
 <script>
-
     // --- Tab 切换 ---
     $('.settings-tab-item').click(function() {
         $('.settings-tab-item').removeClass('active');
@@ -575,69 +591,122 @@
     // ==========================================
     if (document.getElementById('report-type')) {
         let currentPage = 1;
-        
-        // 切换 SQL 显示
+
+        // 1. 获取后端地址
+        function getServerUrl() {
+            return $('input[data-key="pythonServerUrl"]').val() || 'http://127.0.0.1:11542/';
+        }
+
+        // 3. 切换 SQL 输入框
         $('#report-type').change(function() {
             if($(this).val() === 'sql') $('#sql-container').show();
             else $('#sql-container').hide();
         });
 
-        // 刷新数据表
+        // 4. 数据表格加载
         function loadActivityData(page) {
             let search = $('#data-search').val();
-            fetch(live2d_settings.pythonServerUrl + `report/data?page=${page}&size=10&search=${search}`)
+            let url = getServerUrl() + `report/data?page=${page}&size=10&search=${encodeURIComponent(search)}`;
+            
+            fetch(url)
             .then(r=>r.json())
             .then(res => {
                 let tbody = $('#activity-table tbody');
                 tbody.empty();
-                res.rows.forEach(row => {
-                    // row: [id, date, time, app, title, duration]
-                    tbody.append(`
-                        <tr style="border-bottom:1px solid #eee;">
-                            <td style="padding:4px;">${row[1]} ${row[2]}</td>
-                            <td style="padding:4px;">${row[3]}</td>
-                            <td style="padding:4px;">${row[4].substring(0, 20)}...</td>
-                            <td style="padding:4px;">${row[5]}</td>
-                        </tr>
-                    `);
-                });
-                $('#page-info').text(res.page + " / " + Math.ceil(res.total/10));
-                currentPage = res.page;
-            });
+                if (res.rows && res.rows.length > 0) {
+                    res.rows.forEach(row => {
+                        tbody.append(`
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:4px;">${row[1]} ${row[2]}</td>
+                                <td style="padding:4px;">${row[3]}</td>
+                                <td style="padding:4px;" title="${row[4]}">${row[4].substring(0, 20)}...</td>
+                                <td style="padding:4px;">${row[5]}</td>
+                            </tr>
+                        `);
+                    });
+                    $('#page-info').text(res.page + " / " + Math.ceil(res.total/10));
+                    currentPage = res.page;
+                } else {
+                    tbody.html('<tr><td colspan="4" style="text-align:center;padding:10px;color:#999;">暂无数据</td></tr>');
+                }
+            })
+            .catch(e => console.log("数据加载失败"));
         }
 
         $('#btn-refresh-data').click(() => loadActivityData(1));
         $('#btn-prev-page').click(() => { if(currentPage > 1) loadActivityData(currentPage-1); });
         $('#btn-next-page').click(() => loadActivityData(currentPage+1));
         $('#data-search').change(() => loadActivityData(1));
+        
+        $('#btn-clear-data').click(() => {
+            if(confirm("危险操作：确定要清空所有历史记录吗？")) {
+                fetch(getServerUrl() + 'report/clear', {method:'POST'})
+                .then(() => {
+                    alert("数据已清空");
+                    loadActivityData(1);
+                });
+            }
+        });
 
-        // 生成报告
+        // 5. 刷新报告列表
+        function loadReportList() {
+            fetch(getServerUrl() + 'report/list')
+            .then(r=>r.json())
+            .then(res => {
+                let ul = $('#report-file-list');
+                ul.empty();
+                if (res.files && res.files.length > 0) {
+                    res.files.forEach(f => {
+                        let url = getServerUrl() + "storage/user_report/html/" + f;
+                        ul.append(`
+                            <li style="padding:5px; border-bottom:1px dashed #eee; display:flex; justify-content:space-between;">
+                                <a href="#" onclick="window.open('${url}');return false;" style="text-decoration:none; color:#333;">📄 ${f}</a>
+                                <span style="font-size:10px; color:#999; cursor:pointer;" onclick="window.open('${url}')">查看</span>
+                            </li>
+                        `);
+                    });
+                } else {
+                    ul.html('<li style="padding:10px; text-align:center; color:#999; font-size:12px;">暂无历史报告</li>');
+                }
+            });
+        }
+        $('#btn-refresh-reports').click(loadReportList);
+
+        // 6. 生成报告
         $('#btn-gen-report').click(function() {
-            let model = $('#model-normal').val();
-            if(!model) { alert("请先在 LLM设置 中选择模型"); return; }
+            // 获取模型ID (优先使用报告专用模型)
+            let model = $('#model-report').val(); 
+            // 如果没选报告模型，尝试用普通模型兜底
+            if (!model && typeof live2d_settings !== 'undefined') {
+                 model = live2d_settings.modelNormal;
+                 if (model && confirm("未选择报告专用模型，是否使用普通对话模型生成？")) {
+                     // pass
+                 } else {
+                     alert("请选择一个模型！"); return;
+                 }
+            }
+            if (!model) { alert("请先选择模型！"); return; }
             
-            showMessage("正在分析数据并编写报告，可能需要几十秒...", 6000, true);
+            // UI 提示
+            var btn = $(this);
+            var originText = btn.text();
+            btn.text("生成中...").prop("disabled", true);
             
-            // 1. 获取聊天历史
+            if (typeof showMessage === 'function') showMessage("正在使用 [" + model + "] 分析数据...", 6000, true);
+            
             let historyStr = localStorage.getItem('waifu_chat_history') || "[]";
             let history = [];
-            try {
-                history = JSON.parse(historyStr);
-            } catch(e) {}
-
-            // 为了防止请求体过大，限制最近 100 条，或者根据你的需求调整
-            // 后端会根据 /chat_context:N 再进行二次裁剪
-            let historyToSend = history //.slice(-100); 
+            try { history = JSON.parse(historyStr).slice(-100); } catch(e) {}
 
             let payload = {
                 model: model,
                 type: $('#report-type').val(),
                 sql: $('#report-sql').val(),
-                chat_history: historyToSend,
+                chat_history: history, 
                 prompt_template: $('#report-prompt').val()
             };
 
-            fetch(live2d_settings.pythonServerUrl + 'report/generate', {
+            fetch(getServerUrl() + 'report/generate', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload)
@@ -645,41 +714,65 @@
             .then(r=>r.json())
             .then(res => {
                 if(res.success) {
-                    showMessage("报告生成成功！", 3000, true);
-                    loadReportList(); // 刷新文件列表
-                    // 自动打开预览
-                    window.open(live2d_settings.pythonServerUrl + "storage/user_report/html/" + res.filename);
+                    if (typeof showMessage === 'function') showMessage("报告生成成功！", 3000, true);
+                    loadReportList();
+                    // 尝试打开
+                    window.open(getServerUrl() + "storage/user_report/html/" + res.filename);
                 } else {
                     alert("生成失败: " + res.reply);
                 }
+            })
+            .catch(e => alert("请求失败: " + e))
+            .finally(() => {
+                btn.text(originText).prop("disabled", false);
             });
         });
 
-        // 刷新报告列表
-        function loadReportList() {
-            fetch(live2d_settings.pythonServerUrl + 'report/list')
-            .then(r=>r.json())
-            .then(res => {
-                let ul = $('#report-file-list');
-                ul.empty();
-                res.files.forEach(f => {
-                    let url = live2d_settings.pythonServerUrl + "storage/user_report/html/" + f;
-                    ul.append(`
-                        <li style="padding:5px; border-bottom:1px dashed #eee; display:flex; justify-content:space-between;">
-                            <a href="#" onclick="window.open('${url}')">${f}</a>
-                            <span style="font-size:10px; color:#999; cursor:pointer;" onclick="window.open('${url}')">查看</span>
-                        </li>
-                    `);
-                });
-            });
-        }
-        $('#btn-refresh-reports').click(loadReportList);
-        
-        // 初始加载
-        // loadActivityData(1); // 考虑到性能，可以不自动加载，让用户点刷新
-        loadReportList();
+        // 7. 切换到此 Tab 时自动加载数据 (懒加载)
+        $('.settings-tab-item[data-tab="report"]').one('click', function() {
+            loadReportList();
+            loadActivityData(1);
+        });
     }
     // ==========================================
     // 报告中心结束
     // ==========================================
+
+    // 提示词重置功能
+    $('#btn-reset-report-prompt').click(function() {
+        if(confirm("重置报告生成提示词？")) {
+            $('#report-prompt').val(default_settings.reportPrompt); 
+            live2d_settings.reportPrompt = default_settings.reportPrompt;
+            saveGlobalSettings();
+        }
+    });
+    $('#btn-reset-roast').click(function() {
+        if(confirm('重置吐槽提示词？')) { 
+            $('#prompt-roast').val(default_settings.roastPrompt); 
+            live2d_settings.roastPrompt = default_settings.roastPrompt;
+            saveGlobalSettings();
+        }
+    });
+    $('#btn-reset-chat').click(function() {
+        if(confirm('重置助手提示词？')) { 
+            $('#prompt-chat').val(default_settings.chatPrompt); 
+            live2d_settings.chatPrompt = default_settings.chatPrompt;
+            saveGlobalSettings();
+        }
+    });
+    $('#btn-reset-waifu').click(function(){ 
+        if(confirm('重置看板娘提示词？')) { 
+            $('#prompt-waifu').val(defaultSettings.waifuPrompt); 
+            live2d_settings.waifuPrompt = defaultSettings.waifuPrompt;
+            saveGlobalSettings();
+        }
+    });
+
+    // 刷新模型列表
+    $('.btn-refresh-models').click(function() {
+        window.WaifuShared.fetchModelList($(this));
+    });
+
+    // 刷新窗口列表
+    $('#btn-refresh-windows').click(async function() {window.WaifuShared.refreshWindowList($(this))});
 </script>

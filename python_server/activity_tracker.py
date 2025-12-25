@@ -8,6 +8,8 @@ import threading
 import datetime
 import json
 
+import config_manager
+
 # === 路径配置 ===
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 # 根目录/storage/user_report/database/
@@ -25,9 +27,11 @@ class ActivityTracker:
     def __init__(self):
         self.running = False
         self._init_db()
+        self.HTML_DIR = HTML_DIR 
+        self.DB_PATH = DB_PATH
         self.config = {
-            "enabled": True, # 默认开启
-            "prompt": "请根据以下数据生成HTML报告...", # 默认Prompt后续在前端设置
+            "enabled": True,
+            "prompt": "请根据以下数据生成HTML报告...",
         }
 
     def _init_db(self):
@@ -83,8 +87,11 @@ class ActivityTracker:
         cursor = conn.cursor()
         
         while self.running:
-            # 检查配置开关
-            if not self.config.get("enabled", True):
+            # 【核心修改】每次循环读取最新配置
+            # 这样用户在 settings_window 改了之后，这里哪怕不重启也能大概5秒后生效
+            cfg = config_manager.load_config()
+            if not cfg.get("record_activity", True):
+                # 如果关闭了，就空转
                 time.sleep(5)
                 continue
 

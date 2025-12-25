@@ -114,8 +114,147 @@ window.WAIFU_GLOBAL_DEFAULTS = {
 
 要求：
 1. 返回纯 HTML 代码，不要包含 Markdown 标记（如 \`\`\`html）。
-2. 必须包含 CSS 样式，界面要现代、可爱、二次元风格（粉色/淡蓝色调）。
+2. 必须包含 CSS 样式，界面要现代、可爱。
 3. 总结用户的活动（工作了多久，玩了多久）。
 4. 结合聊天记录，给出一份“用户画像”或“心情分析”。
-5. 【重要】如果可以，请在 HTML 中嵌入简单的 Chart.js 或 ECharts 代码来可视化数据（如饼图、雷达图或条形图）。`,
+5. 【重要】如果可以，请在 HTML 中嵌入简单的可视化图表来可视化数据（如饼图、雷达图或条形图）。`,
+
+    modelReport:        '',             // 报告生成模型
+};
+
+// ==========================================
+//       1. 全局配置默认值定义 (统一入口)
+// ==========================================
+
+const default_settings = JSON.parse(JSON.stringify(window.WAIFU_GLOBAL_DEFAULTS));
+
+// ==========================================
+//       2. 初始化配置 (加载本地存储)
+// ==========================================
+
+default_settings.defaultModel = default_settings.defaultModel.replace(/MODEL_HOME/g, default_settings.staticPath);
+
+// 初始化全局对象 (使用 Object 而不是 Array)
+window.live2d_settings = {};
+
+try {
+    // 1. 加载所有设置到 live2d_settings
+    var saved = localStorage.getItem('waifu_global_settings');
+    var savedObj = saved ? JSON.parse(saved) : {};
+
+    // 2. 深度合并：默认值 -> 本地存储值
+    // 使用 $.extend(true, ...) 如果需要深拷贝，或者简单的一层合并
+    // 这里使用 Object.assign 或 $.extend 均可
+    window.live2d_settings = $.extend({}, default_settings, savedObj);
+    
+    console.log('[Status] Configuration loaded.');
+} catch (e) { 
+    console.error('Settings Load Error', e); 
+    window.live2d_settings = default_settings; // 降级处理
+}
+
+// 辅助函数：保存当前所有设置到统一的 Key
+function saveGlobalSettings() {
+    try {
+        // 过滤掉不需要保存的运行时状态 (可选)
+        // var toSave = JSON.parse(JSON.stringify(live2d_settings));
+        // delete toSave.isLLMThinking;
+        
+        localStorage.setItem('waifu_global_settings', JSON.stringify(live2d_settings));
+    } catch (e) {
+        console.error("Save Error:", e);
+    }
+}
+
+// ==========================================
+
+// 全局方法
+window.WaifuShared = {
+    fetchModelList: async function(btn) {
+        let live2d_settings = window.live2d_settings
+        if(btn) btn.text('刷新中...');
+        try {
+            var url = live2d_settings.pythonServerUrl + 'list_models';
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            var optionsHtml = '';
+            if (data.models && data.models.length > 0) {
+                data.models.forEach(m => { optionsHtml += `<option value="${m}">${m}</option>`; });
+            } else {
+                optionsHtml = '<option value="">未找到模型</option>';
+            }
+            $('#model-normal').html(optionsHtml);
+            $('#model-thinking').html(optionsHtml);
+            $('#model-report').html(optionsHtml);
+
+            if (live2d_settings.modelNormal){
+                if($('#model-normal option[value="' + live2d_settings.modelNormal + '"]').length === 0)
+                    $('#model-normal').html(`<option value="${live2d_settings.modelNormal}">${live2d_settings.modelNormal}</option>`);
+                $('#model-normal').val(live2d_settings.modelNormal);
+            }
+                
+            if (live2d_settings.modelThinking){
+                if ($('#model-thinking option[value="' + live2d_settings.modelThinking + '"]').length === 0)
+                    $('#model-thinking').html(`<option value="${live2d_settings.modelThinking}">${live2d_settings.modelThinking}</option>`);
+                $('#model-thinking').val(live2d_settings.modelThinking);
+            }
+            if (live2d_settings.modelReport){
+                if ($('#model-report option[value="' + live2d_settings.modelReport + '"]').length === 0)
+                    $('#model-report').html(`<option value="${live2d_settings.modelReport}">${live2d_settings.modelReport}</option>`);
+                $('#model-report').val(live2d_settings.modelReport);
+            }
+            
+            if (!$('#model-normal').val() && data.models.length>0) {
+                $('#model-normal').val(data.models[0]);
+                live2d_settings.modelNormal = data.models[0];
+            }
+            if (!$('#model-thinking').val() && data.models.length>0) {
+                $('#model-thinking').val(data.models[0]);
+                live2d_settings.modelThinking = data.models[0];
+            }
+            if (!$('#model-report').val() && data.models.length>0) {
+                $('#model-report').val(data.models[0]);
+                live2d_settings.modelReport = data.models[0];
+            }
+
+        } catch (e) {
+            console.error("模型列表获取失败：", e);
+            if (live2d_settings.modelNormal){
+                $('#model-normal').html(`<option value="${live2d_settings.modelNormal}">${live2d_settings.modelNormal} (离线)</option>`);
+                $('#model-normal').val(live2d_settings.modelNormal);
+            }
+            if (live2d_settings.modelThinking){
+                $('#model-thinking').html(`<option value="${live2d_settings.modelThinking}">${live2d_settings.modelThinking} (离线)</option>`);
+                $('#model-thinking').val(live2d_settings.modelThinking);
+            }
+            if (live2d_settings.modelReport){
+                $('#model-report').html(`<option value="${live2d_settings.modelReport}">${live2d_settings.modelReport} (离线)</option>`);
+                $('#model-report').val(live2d_settings.modelReport);
+            }
+        }
+        if(btn) btn.text('刷新列表');
+    },
+
+    refreshWindowList: async function($btn) {
+        if($btn) $btn.text('...');
+        try {
+            const response = await fetch(live2d_settings.pythonServerUrl + 'list_windows');
+            const data = await response.json();
+            var html = '';
+            if (data.windows) {
+                data.windows.forEach(w => html += `<option value="${w.id}">${w.title}</option>`);
+            }
+            $('#peek-window-list').html(html);
+            
+            // 回显
+            if(window.live2d_settings && window.live2d_settings.targetHwid) {
+                $('#peek-window-list').val(window.live2d_settings.targetHwid);
+            }
+        } catch (e) {
+            console.error(e);
+            // alert('获取窗口失败'); // 可选
+        }
+        if($btn) $btn.text('刷新');
+    },
 };

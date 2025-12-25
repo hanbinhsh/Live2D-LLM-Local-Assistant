@@ -19,52 +19,6 @@
     　　　　　 　　　'ｰ'　　!_,.:
 */
 
-// ==========================================
-//       1. 全局配置默认值定义 (统一入口)
-// ==========================================
-
-const default_settings = JSON.parse(JSON.stringify(window.WAIFU_GLOBAL_DEFAULTS));
-
-// ==========================================
-//       2. 初始化配置 (加载本地存储)
-// ==========================================
-
-default_settings.defaultModel = default_settings.defaultModel.replace(/MODEL_HOME/g, default_settings.staticPath);
-
-// 初始化全局对象 (使用 Object 而不是 Array)
-window.live2d_settings = {};
-
-try {
-    // 1. 加载所有设置到 live2d_settings
-    var saved = localStorage.getItem('waifu_global_settings');
-    var savedObj = saved ? JSON.parse(saved) : {};
-
-    // 2. 深度合并：默认值 -> 本地存储值
-    // 使用 $.extend(true, ...) 如果需要深拷贝，或者简单的一层合并
-    // 这里使用 Object.assign 或 $.extend 均可
-    window.live2d_settings = $.extend({}, default_settings, savedObj);
-    
-    console.log('[Status] Configuration loaded.');
-} catch (e) { 
-    console.error('Settings Load Error', e); 
-    window.live2d_settings = default_settings; // 降级处理
-}
-
-// 辅助函数：保存当前所有设置到统一的 Key
-function saveGlobalSettings() {
-    try {
-        // 过滤掉不需要保存的运行时状态 (可选)
-        // var toSave = JSON.parse(JSON.stringify(live2d_settings));
-        // delete toSave.isLLMThinking;
-        
-        localStorage.setItem('waifu_global_settings', JSON.stringify(live2d_settings));
-    } catch (e) {
-        console.error("Save Error:", e);
-    }
-}
-
-/****************************************************************************************************/
-
 // Load static api configurations
 var staticAPI;
 var staticAPILoaded = false;
@@ -644,7 +598,7 @@ function initModel(waifuPath, type) {
 
     $(document).ready(function() {
         toggleUI();
-        fetchModelList();
+        window.WaifuShared.fetchModelList();
     });
     // 切换 UI 显示
     function toggleUI() {
@@ -656,105 +610,12 @@ function initModel(waifuPath, type) {
         else $('#group-window-select').hide();
     }
 
-    // 刷新模型列表
-    $('#btn-refresh-models').click(function() {
-        $(this).text('刷新中...');
-        fetchModelList($(this));
-    });
-    // 重置提示词
-    $('#btn-reset-roast').click(function() {
-        if(confirm('重置吐槽提示词？')) { 
-            $('#prompt-roast').val(default_settings.roastPrompt); 
-            live2d_settings.roastPrompt = default_settings.roastPrompt;
-            saveGlobalSettings();
-        }
-    });
-    $('#btn-reset-chat').click(function() {
-        if(confirm('重置助手提示词？')) { 
-            $('#prompt-chat').val(default_settings.chatPrompt); 
-            live2d_settings.chatPrompt = default_settings.chatPrompt;
-            saveGlobalSettings();
-        }
-    });
-    $('#btn-reset-waifu').click(function(){ 
-        if(confirm('重置看板娘提示词？')) { 
-            $('#prompt-waifu').val(defaultSettings.waifuPrompt); 
-            live2d_settings.waifuPrompt = defaultSettings.waifuPrompt;
-            saveGlobalSettings();
-        }
-    });
-    // 刷新窗口列表
-    $('#btn-refresh-windows').click(async function() {
-        var $btn = $(this);
-        $btn.text('...');
-        try {
-            const response = await fetch(live2d_settings.pythonServerUrl + 'list_windows');
-            const data = await response.json();
-            var html = '';
-            if (data.windows) {
-                data.windows.forEach(w => html += `<option value="${w.id}">${w.title}</option>`);
-            }
-            $('#peek-window-list').html(html);
-            if(live2d_settings.targetHwid) $('#peek-window-list').val(live2d_settings.targetHwid);
-        } catch (e) { console.log(e) }
-        $btn.text('刷新');
-    });
-
     setTimeout(function() {
         if (live2d_settings.pythonServerUrl) {
-            fetchModelList();
+            window.WaifuShared.fetchModelList();
             $('#btn-refresh-windows').click(); 
         }
     }, 100);
-    
-    // 获取模型列表
-    async function fetchModelList(btn) {
-        try {
-            var url = live2d_settings.pythonServerUrl + 'list_models';
-            const response = await fetch(url);
-            const data = await response.json();
-            
-            var optionsHtml = '';
-            if (data.models && data.models.length > 0) {
-                data.models.forEach(m => { optionsHtml += `<option value="${m}">${m}</option>`; });
-            } else {
-                optionsHtml = '<option value="">未找到模型</option>';
-            }
-            $('#model-normal').html(optionsHtml);
-            $('#model-thinking').html(optionsHtml);
-            if (live2d_settings.modelNormal){
-                if($('#model-normal option[value="' + live2d_settings.modelNormal + '"]').length === 0)
-                    $('#model-normal').html(`<option value="${live2d_settings.modelNormal}">${live2d_settings.modelNormal}</option>`);
-                $('#model-normal').val(live2d_settings.modelNormal);
-            }
-                
-            if (live2d_settings.modelThinking){
-                if ($('#model-thinking option[value="' + live2d_settings.modelThinking + '"]').length === 0)
-                    $('#model-thinking').html(`<option value="${live2d_settings.modelThinking}">${live2d_settings.modelThinking}</option>`);
-                $('#model-thinking').val(live2d_settings.modelThinking);
-            }
-            
-            if (!$('#model-normal').val() && data.models.length>0) {
-                $('#model-normal').val(data.models[0]);
-                live2d_settings.modelNormal = data.models[0];
-            }
-            if (!$('#model-thinking').val() && data.models.length>0) {
-                $('#model-thinking').val(data.models[0]);
-                live2d_settings.modelThinking = data.models[0];
-            }
-        } catch (e) {
-            console.error("模型列表获取失败：", e);
-            if (live2d_settings.modelNormal){
-                $('#model-normal').html(`<option value="${live2d_settings.modelNormal}">${live2d_settings.modelNormal} (离线)</option>`);
-                $('#model-normal').val(live2d_settings.modelNormal);
-            }
-            if (live2d_settings.modelThinking){
-                $('#model-thinking').html(`<option value="${live2d_settings.modelThinking}">${live2d_settings.modelThinking} (离线)</option>`);
-                $('#model-thinking').val(live2d_settings.modelThinking);
-            }
-        }
-        if(btn) btn.text('刷新列表');
-    }
 
     function getActiveModel(isThinkingMode) {
         var m = isThinkingMode ? live2d_settings.modelThinking : live2d_settings.modelNormal;

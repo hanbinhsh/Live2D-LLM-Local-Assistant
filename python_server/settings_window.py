@@ -25,6 +25,9 @@ class SettingsWindow(QWidget):
         self.send_udp_cmd("border:off")
         event.accept()
 
+    def on_record_change(self, checked):
+        config_manager.save_config({"record_activity": checked})
+
     def init_ui(self):
         layout = QVBoxLayout()
 
@@ -55,6 +58,13 @@ class SettingsWindow(QWidget):
         self.chk_startup.setChecked(startup_manager.is_startup_enabled())
         self.chk_startup.toggled.connect(self.on_startup_change)
         layout_sys.addWidget(self.chk_startup)
+
+        # 活动记录开关
+        self.chk_record = QCheckBox("后台活动记录 (生成日报)")
+        self.chk_record.setToolTip("记录前台窗口标题和时长，用于生成日报。\n数据仅保存在本地 storage/activity_log.db 中。")
+        self.chk_record.setChecked(self.cfg.get("record_activity", True))
+        self.chk_record.toggled.connect(self.on_record_change)
+        layout_sys.addWidget(self.chk_record)
 
         # 兼容模式 (D3D9)
         self.chk_d3d9 = QCheckBox("兼容模式 (解决闪烁/闪退)")

@@ -36,6 +36,7 @@ DEFAULT_CONFIG = {
     "track_refresh": 30,    # 鼠标刷新率 ms
     "track_threshold": 10,  # 防抖阈值 px
     "idle_timeout": 2.0,    # 闲置判定时间 s
+    "record_activity": True # 是否记录用户活动数据
 }
 
 def load_config():

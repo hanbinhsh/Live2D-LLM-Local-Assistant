@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>看板娘控制台 - 设置中心</title>
-    <script src="assets/waifu-config.js"></script>
     <script src="assets/jquery.min.js?v=3.3.1"></script>
+    <script src="assets/waifu-config.js"></script>
     <!-- 复用部分原有样式 -->
     <link rel="stylesheet" type="text/css" href="assets/waifu.css?v=1.4.2"/>
     
@@ -255,18 +255,14 @@
     </style>
 </head>
 <body>
-
     <div class="waifu-settings-wrapper">
         <div class="settings-header">
             <span>🔧 看板娘设置中心</span>
         </div>
         <div id="settings-inject-container" style="height: 95%; display:flex; flex-direction:column">
-            <!-- 加载中提示 -->
             <div style="padding:20px; text-align:center;">正在加载设置面板...</div>
         </div>
     </div>
-
-    <!-- 逻辑代码已更新为统一配置模式 -->
     <script>
         $(document).ready(function() {
 
@@ -348,67 +344,7 @@
                 else $('#group-window-select').hide();
             }
 
-            // --- 6. 远程数据获取 (模型列表与窗口列表) ---
-            function getPythonUrl() {
-                var url = $('input[data-key="pythonServerUrl"]').val();
-                if (!url) return '';
-                return url.endsWith('/') ? url : url + '/';
-            }
-
-            async function fetchModelList() {
-                var $btn = $('#btn-refresh-models');
-                var $selects = $('#model-normal, #model-thinking');
-                
-                $btn.text('刷新中...');
-
-                try {
-                    var apiUrl = getPythonUrl();
-                    if (!apiUrl) throw new Error("API地址为空");
-
-                    const response = await fetch(apiUrl + 'list_models');
-                    const data = await response.json();
-                    
-                    var html = '';
-                    if (data.models && data.models.length > 0) {
-                        data.models.forEach(m => html += `<option value="${m}">${m}</option>`);
-                    } else {
-                        html = '<option value="">未找到模型</option>';
-                    }
-                    
-                    $selects.html(html);
-
-                    // 列表刷新后，重新从 LocalStorage 恢复选中的值
-                    // 否则下拉框会重置为第一个选项
-                    var saved = JSON.parse(localStorage.getItem('waifu_global_settings') || '{}');
-                    if (saved.modelNormal){
-                        if($('#model-normal option[value="' + saved.modelNormal + '"]').length === 0)
-                            $('#model-normal').html(`<option value="${saved.modelNormal}">${saved.modelNormal}</option>`);
-                        $('#model-normal').val(saved.modelNormal);
-                    }
-                        
-                    if (saved.modelThinking){
-                        if ($('#model-thinking option[value="' + saved.modelThinking + '"]').length === 0)
-                            $('#model-thinking').html(`<option value="${saved.modelThinking}">${saved.modelThinking}</option>`);
-                        $('#model-thinking').val(saved.modelThinking);
-                    }
-                } catch (e) {
-                    console.error("模型列表获取失败：", e);
-                    if (saved.modelNormal){
-                        $('#model-normal').html(`<option value="${saved.modelNormal}">${saved.modelNormal} (离线)</option>`);
-                        $('#model-normal').val(saved.modelNormal);
-                    }
-                    if (saved.modelThinking){
-                        $('#model-thinking').html(`<option value="${saved.modelThinking}">${saved.modelThinking} (离线)</option>`);
-                        $('#model-thinking').val(saved.modelThinking);
-                    }
-                } finally {
-                    $btn.text('刷新列表');
-                }
-            }
-
-            $('#btn-refresh-models').click(function() {
-                fetchModelList();
-            });
+            // --- 6. 清除对话数据 ---
 
             $('#btn-clear-memory').click(function() {
                 if(confirm('确定要让看板娘忘记之前的所有对话吗？')) {
@@ -416,47 +352,13 @@
                 }
             });
 
-            $('#btn-refresh-windows').click(async function() {
-                var $btn = $(this);
-                $btn.text('...');
-                try {
-                    const response = await fetch(getPythonUrl() + 'list_windows');
-                    const data = await response.json();
-                    var html = '';
-                    if (data.windows) {
-                        data.windows.forEach(w => html += `<option value="${w.id}">${w.title}</option>`);
-                    }
-                    $('#peek-window-list').html(html);
-                    
-                    var saved = JSON.parse(localStorage.getItem('waifu_global_settings') || '{}');
-                    if(saved.targetHwid) $('#peek-window-list').val(saved.targetHwid);
-                    
-                } catch (e) {
-                    alert('获取窗口失败');
-                }
-                $btn.text('刷新');
-            });
-            
-            // 重置提示词按钮
-            $('#btn-reset-roast').click(function(){ 
-                $('#prompt-roast').val(defaultSettings.roastPrompt); saveSettings(); 
-            });
-            $('#btn-reset-chat').click(function(){ 
-                $('#prompt-chat').val(defaultSettings.chatPrompt); saveSettings(); 
-            });
-            $('#btn-reset-waifu').click(function(){ 
-                $('#prompt-waifu').val(defaultSettings.waifuPrompt); saveSettings(); 
-            });
-
             // --- 7. 初始化执行 ---
-            
-            // 加载所有设置
             loadSettings(); 
             
             // 自动尝试加载模型列表
             setTimeout(function() {
                 if ($('input[data-key="pythonServerUrl"]').val()) {
-                    fetchModelList();
+                    window.WaifuShared.fetchModelList();
                     $('#btn-refresh-windows').click(); 
                 }
             }, 100);

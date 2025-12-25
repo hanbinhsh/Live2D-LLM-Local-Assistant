@@ -396,10 +396,10 @@ def generate_report_llm(req: dict):
         
         要求：
         1. 返回纯 HTML 代码，不要包含 Markdown 标记（如 ```html）。
-        2. 必须包含 CSS 样式，界面要现代、可爱、二次元风格（粉色/淡蓝色调）。
+        2. 必须包含 CSS 样式，界面要现代、可爱。
         3. 总结用户的活动（工作了多久，玩了多久）。
         4. 结合聊天记录，给出一份“用户画像”或“心情分析”。
-        5. 【重要】如果可以，请在 HTML 中嵌入简单的 Chart.js 或 ECharts 代码来可视化数据（如饼图、雷达图或条形图）。
+        5. 【重要】如果可以，请在 HTML 中嵌入简单的可视化图表来可视化数据（如饼图、雷达图或条形图）。
         """
 
     # === 4. 占位符解析与替换逻辑 (核心) ===
@@ -464,6 +464,7 @@ def generate_report_llm(req: dict):
         }
         
         print("[Report] Prompt Constructed. Requesting LLM...")
+        print("[Report] Prompt：", final_prompt)
         response = requests.post(OLLAMA_API, json=payload)
         result = response.json()
         
