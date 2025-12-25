@@ -374,6 +374,9 @@
         $('#tab-' + $(this).data('tab')).show();
     });
 
+    // ==========================================
+    // [settings-content.html] 聊天记录导入导出功能
+    // ==========================================
     $('#btn-export-history').click(function() {
         // 1. 获取数据
         var historyStr = localStorage.getItem('waifu_chat_history');
@@ -660,8 +663,8 @@
                         let url = getServerUrl() + "storage/user_report/html/" + f;
                         ul.append(`
                             <li style="padding:5px; border-bottom:1px dashed #eee; display:flex; justify-content:space-between;">
-                                <a href="#" onclick="window.open('${url}');return false;" style="text-decoration:none; color:#333;">📄 ${f}</a>
-                                <span style="font-size:10px; color:#999; cursor:pointer;" onclick="window.open('${url}')">查看</span>
+                                <a href="#" onclick="window.location.href='${url}';return false;" style="text-decoration:none; color:#333;">📄 ${f}</a>
+                                <span style="font-size:10px; color:#999; cursor:pointer;" onclick="window.location.href='${url}'">查看</span>
                             </li>
                         `);
                     });
@@ -716,8 +719,7 @@
                 if(res.success) {
                     if (typeof showMessage === 'function') showMessage("报告生成成功！", 3000, true);
                     loadReportList();
-                    // 尝试打开
-                    window.open(getServerUrl() + "storage/user_report/html/" + res.filename);
+                    window.location.href = getServerUrl() + "storage/user_report/html/" + res.filename;
                 } else {
                     alert("生成失败: " + res.reply);
                 }

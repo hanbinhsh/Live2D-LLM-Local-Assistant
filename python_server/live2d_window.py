@@ -5,7 +5,7 @@ import socket
 import json
 import time
 from PyQt5.QtCore import Qt, QUrl, QPoint, QThread, pyqtSignal, QEvent, QObject, QTimer, QCoreApplication
-from PyQt5.QtGui import QCursor
+from PyQt5.QtGui import QCursor, QDesktopServices
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFrame, QVBoxLayout
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEnginePage
 import config_manager
@@ -18,6 +18,23 @@ CMD_PORT = 10453
 REMOTE_DEBUG_PORT = "9222"
 # =======================================
 
+# --- 拦截器 Page，用于拦截报告跳转并调用系统浏览器 ---
+class ReportInterceptorPage(QWebEnginePage):
+    def acceptNavigationRequest(self, url, _type, isMainFrame):
+        # 获取目标 URL 字符串
+        url_str = url.toString()
+        
+        # 判断：如果是试图访问 storage/user_report 下的 html 文件
+        if "/storage/user_report/html/" in url_str and url_str.endswith(".html"):
+            print(f"[Window] Intercepting report open: {url_str}")
+            # 调用系统默认浏览器打开
+            QDesktopServices.openUrl(url)
+            # 返回 False，阻止设置窗口自己跳转（保持在设置页）
+            return False
+            
+        # 其他情况（如加载 settings.html）放行
+        return True
+# ------------------------------------------------------
 class WebSettingsWindow(QMainWindow):
     def __init__(self, profile):
         super().__init__()
@@ -25,7 +42,9 @@ class WebSettingsWindow(QMainWindow):
         self.resize(1000, 750)
         self.setAttribute(Qt.WA_DeleteOnClose, False)
         self.browser = QWebEngineView(self)
-        page = QWebEnginePage(profile, self.browser)
+        # 使用自定义的 ReportInterceptorPage
+        # 传入 profile 以保持 localStorage 共享
+        page = ReportInterceptorPage(profile, self.browser)
         self.browser.setPage(page)
         self.setCentralWidget(self.browser)
         self.browser.load(QUrl(SETTINGS_PAGE))
@@ -160,7 +179,7 @@ class TransparentLive2DWindow(QMainWindow):
 
     def init_browser(self):
         self.browser = QWebEngineView(self.container)
-        page = QWebEnginePage(self.profile, self.browser)
+        page = ReportInterceptorPage(self.profile, self.browser)
         self.browser.setPage(page)
         self.browser.page().setBackgroundColor(Qt.transparent)
         self.layout.addWidget(self.browser)
