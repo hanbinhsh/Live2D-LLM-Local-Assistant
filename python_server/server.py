@@ -13,6 +13,7 @@ import pyperclip
 import uuid
 import datetime
 from fastapi.staticfiles import StaticFiles
+import json
 
 app = FastAPI()
 
@@ -298,6 +299,29 @@ async def upload_image(req: ImageUploadRequest):
     except Exception as e:
         print(f"上传失败: {e}")
         raise HTTPException(status_code=500, detail="图片保存失败")
+
+# === 聊天记录导出功能 ===
+@app.post("/history/export")
+async def export_history_to_file(req: dict):
+    try:
+        history_data = req.get("data")
+        # 保存到 storage/export 目录，或者桌面
+        export_dir = os.path.join(PROJECT_ROOT, "storage", "exports")
+        if not os.path.exists(export_dir):
+            os.makedirs(export_dir)
+            
+        filename = f"chat_history_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        filepath = os.path.join(export_dir, filename)
+        
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(history_data, f, indent=2, ensure_ascii=False)
+            
+        # 尝试打开文件夹 (Windows)
+        os.startfile(export_dir)
+        
+        return {"success": True, "path": filepath}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

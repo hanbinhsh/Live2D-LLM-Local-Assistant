@@ -287,7 +287,31 @@
             return;
         }
 
+        var jsonData = JSON.parse(historyStr);
+        fetch(live2d_settings.pythonServerUrl + 'history/export', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ data: jsonData })
+        })
+        .then(r => r.json())
+        .then(res => {
+            if(res.success) {
+                alert("导出成功！文件已保存至:\n" + res.path);
+            } else {
+                // 如果后端失败（比如只是普通浏览器访问），回退到 Blob 下载
+                console.warn("后端导出失败，尝试浏览器下载", res.error);
+                fallbackExport(historyStr);
+            }
+        })
+        .catch(e => {
+            alert('导出失败，网络错误。');
+            fallbackExport(historyStr);
+        });
+    });
+
+    function fallbackExport(content) {
         try {
+            alert('点击了按钮');
             // 2. 格式化 JSON 为了可读性 (可选，如果文件太大可以去掉 null, 2)
             var formattedJson = JSON.stringify(JSON.parse(historyStr), null, 2);
             
@@ -311,7 +335,7 @@
             console.error(e);
             alert('导出失败，数据格式可能损坏。');
         }
-    });
+    }
 
     // --- 导入聊天记录 (点击按钮触发文件选择) ---
     $('#btn-import-history').click(function() {
