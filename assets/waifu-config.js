@@ -26,6 +26,7 @@ window.WAIFU_GLOBAL_DEFAULTS = {
     showLLM:            true,           // 显示 LLM 对话    按钮
     showHistory:        true,           // 显示 历史记录    按钮
     showPeek:           true,           // 显示 Peek        按钮
+    showReport:         true,           // 显示 日志生成    按钮
     showSettings:       true,           // 显示 设置        按钮
 
     // --- 交互模式 ---
@@ -120,6 +121,25 @@ window.WAIFU_GLOBAL_DEFAULTS = {
 5. 【重要】如果可以，请在 HTML 中嵌入简单的可视化图表来可视化数据（如饼图、雷达图或条形图）。`,
 
     modelReport:        '',             // 报告生成模型
+    lastReportType: 'daily',            // 上次生成的报告类型 'daily' or 'weekly'
+
+    // steam报告
+    steamApiKey:        '',
+    steamId:            '',
+    steamPrompt: `你是一个游戏搭子兼看板娘。请根据用户的【Steam游戏记录】和【日常活动】，生成一份游戏分析报告。
+
+【Steam数据】:
+/steam_content
+
+【电脑活动】:
+/data:50
+
+要求：
+1. 输出 HTML 格式，风格要赛博朋克或二次元游戏风。
+2. 如果用户最近玩游戏时间很长，吐槽一下他的肝度。
+3. 如果用户买了游戏没玩（库存多但最近游玩少），调侃他是“喜加一”党。
+4. 结合电脑活动，看看他是在摸鱼打游戏还是休息时间打游戏。`,
+
 };
 
 // ==========================================

@@ -114,6 +114,7 @@
             <label><input data-key="showLLM" class="config-item" type="checkbox"> LLM 对话 (星星)</label>
             <label><input data-key="showHistory" class="config-item" type="checkbox"> 对话历史 (信封)</label>
             <label><input data-key="showPeek" class="config-item" type="checkbox"> Peek 屏幕观察 (录像机)</label>
+            <label><input data-key="showReport" class="config-item" type="checkbox"> 日志生成 (日历)</label>
             <label><input data-key="showSettings" class="config-item" type="checkbox"> 设置面板 (齿轮)</label>
         </div>
     </div>
@@ -244,7 +245,9 @@
     </div>
     <!-- Tab 5: 报告中心 -->
     <div id="tab-report" class="tab-pane" style="display:none;">
-        <div class="setting-section-title">报告生成与配置</div>
+        <div class="setting-section-title">报告生成与配置
+            <div style="float:right;"><button id="btn-gen-report" class="waifu-btn secondary">生成报告</button></div>
+        </div>
         
         <!-- 1. 功能开关与配置 -->
         <div class="setting-group">
@@ -253,6 +256,30 @@
             </label>
             <div style="font-size:12px; color:#999; padding:5px 0;">
                 请在托盘菜单的 "窗口及性能配置" 面板中进行设置。
+            </div>
+        </div>
+
+        <div class="setting-group" style="display:flex; gap:5px; margin-top:10px;">
+            <select id="report-type" class="waifu-select config-item" data-key="lastReportType" style="flex:1;">
+                <option value="daily">生成今日日报</option>
+                <option value="weekly">生成本周周报</option>
+                <option value="steam">生成 Steam 游戏报告</option>
+                <option value="sql">执行自定义 SQL</option>
+            </select>
+        </div>
+
+        <div class="setting-section-title" style="margin-top:10px; font-size:12px; color:#409eff;">Steam 统计集成</div>
+        <div class="setting-group" style="display:flex; gap:5px;">
+            <div style="flex:1;">
+                <label class="setting-label" style="font-size:11px;">Steam ID (64位数字)</label>
+                <input id="steam-id" class="waifu-select config-item" data-key="steamId" type="text" placeholder="例如: 76561198xxxxxxxxx">
+            </div>
+            <div style="flex:1;">
+                <label class="setting-label" style="font-size:11px;">
+                    API Key 
+                    <a href="https://steamcommunity.com/dev/apikey" target="_blank" style="color:#409eff;text-decoration:none;">(点击获取)</a>
+                </label>
+                <input id="steam-key" class="waifu-select config-item" data-key="steamApiKey" type="password" placeholder="在此粘贴 Key">
             </div>
         </div>
 
@@ -270,23 +297,18 @@
         <div class="setting-group mtn-group">
             <label class="setting-label">
                 自定义提示词
+                <select id="prompt-type-select" class="waifu-select" style="width:120px; height:24px; padding:0 5px; font-size:11px;">
+                    <option value="general">日报/周报模板</option>
+                    <option value="steam">Steam 报告模板</option>
+                </select>
                 <span style="font-size:10px; color:#888; font-weight:normal;">
                     支持占位符: <code style="background:#eee;">/data:50</code> (插入50条活动数据), 
-                    <code style="background:#eee;">/chat_context:20</code> (插入20条对话)
+                    <code style="background:#eee;">/chat_context:20</code> (插入20条对话),
+                    <code style="background:#eee;">/steam_content</code> (steam游戏数据)
                 </span>
-                <button id="btn-reset-report-prompt" class="waifu-btn secondary">重置默认</button>
+                <button id="btn-reset-current-prompt" class="waifu-btn secondary">重置</button>
             </label>
-            <textarea id="report-prompt" data-key="reportPrompt" class="waifu-textarea config-item"></textarea>
-        </div>
-        
-        <!-- 3. 生成操作区 -->
-        <div class="setting-group" style="display:flex; gap:5px; margin-top:10px;">
-            <select id="report-type" class="waifu-select" style="flex:1;">
-                <option value="daily">生成今日日报</option>
-                <option value="weekly">生成本周周报</option>
-                <option value="sql">执行自定义 SQL</option>
-            </select>
-            <button id="btn-gen-report" class="waifu-btn secondary">生成报告</button>
+            <textarea id="report-prompt" class="waifu-textarea config-item"></textarea>
         </div>
         
         <!-- SQL 输入框 (仅当选择 SQL 时显示) -->
@@ -297,7 +319,7 @@
         <!-- 4. 历史报告列表 -->
         <div class="setting-section-title" style="margin-top:15px;">
             历史报告 
-            <button id="btn-refresh-reports" class="waifu-btn secondary">刷新</button>
+            <div style="float:right;"><button id="btn-refresh-reports" class="waifu-btn secondary">刷新</button></div>
         </div>
         <ul id="report-file-list" style="list-style:none; padding:0; max-height:100px; overflow-y:auto; border:1px solid #eee;">
             <!-- JS 填充 -->
@@ -604,10 +626,72 @@
             return $('input[data-key="pythonServerUrl"]').val() || 'http://127.0.0.1:11542/';
         }
 
+        // 2. 初始化配置与状态恢复
+        function initReportUI() {
+            if (typeof live2d_settings === 'undefined') {
+                console.log("等待 live2d_settings 加载...");
+                setTimeout(initReportUI, 200); return;
+            }
+            updatePromptTextarea();
+        }
+
+        function updatePromptTextarea() {
+            let type = $('#prompt-type-select').val(); // 'general' or 'steam'
+            let content = "";
+            
+            if (type === 'steam') {
+                content = live2d_settings.steamPrompt;
+            } else {
+                content = live2d_settings.reportPrompt; // general
+            }
+            
+            // 如果为空，加载默认值
+            if (!content && typeof window.WAIFU_GLOBAL_DEFAULTS !== 'undefined') {
+                content = type === 'steam' ? window.WAIFU_GLOBAL_DEFAULTS.steamPrompt : window.WAIFU_GLOBAL_DEFAULTS.reportPrompt;
+            }
+            
+            $('#report-prompt').val(content);
+        }
+
+        $('#prompt-type-select').change(function() {
+            updatePromptTextarea();
+        });
+
+        $('#report-prompt').on('input propertychange', function() {
+            let val = $(this).val();
+            let type = $('#prompt-type-select').val();
+            
+            if (type === 'steam') {
+                live2d_settings.steamPrompt = val;
+            } else {
+                live2d_settings.reportPrompt = val;
+            }
+            // 保存到 LocalStorage
+            saveGlobalSettings();
+        });
+
+        $('#steam-id, #steam-key').change(function() {
+            live2d_settings.steamId = $('#steam-id').val();
+            live2d_settings.steamApiKey = $('#steam-key').val();
+            saveGlobalSettings();
+        });
+
         // 3. 切换 SQL 输入框
         $('#report-type').change(function() {
-            if($(this).val() === 'sql') $('#sql-container').show();
+            let val = $(this).val();
+            if(val === 'sql') $('#sql-container').show();
             else $('#sql-container').hide();
+            
+            // 自动切换提示词下拉框 (可选优化)
+            if (val === 'steam') {
+                $('#prompt-type-select').val('steam').trigger('change');
+            } else if (val === 'daily' || val === 'weekly') {
+                $('#prompt-type-select').val('general').trigger('change');
+            }
+
+            // 保存选择
+            live2d_settings.lastReportType = val;
+            saveGlobalSettings();
         });
 
         // 4. 数据表格加载
@@ -649,7 +733,6 @@
             if(confirm("危险操作：确定要清空所有历史记录吗？")) {
                 fetch(getServerUrl() + 'report/clear', {method:'POST'})
                 .then(() => {
-                    alert("数据已清空");
                     loadActivityData(1);
                 });
             }
@@ -699,7 +782,13 @@
             var originText = btn.text();
             btn.text("生成中...").prop("disabled", true);
             
-            if (typeof showMessage === 'function') showMessage("正在使用 [" + model + "] 分析数据...", 6000, true);
+            if (typeof showMessage === 'function') {
+                live2d_settings.isLLMThinking = true;
+                live2d_settings.isLLMWriting = true;
+                showMessage("正在使用 [" + model + "] 分析数据...", 6000, true);
+                live2d_settings.isLLMThinking = false;
+                live2d_settings.isLLMWriting = false;
+            }
             
             let historyStr = localStorage.getItem('waifu_chat_history') || "[]";
             let history = [];
@@ -709,7 +798,9 @@
                 model: model,
                 type: $('#report-type').val(),
                 sql: $('#report-sql').val(),
-                chat_history: history, 
+                chat_history: history,
+                steam_id: $('#steam-id').val(),
+                steam_api_key: $('#steam-key').val(),
                 prompt_template: $('#report-prompt').val()
             };
 
@@ -721,7 +812,13 @@
             .then(r=>r.json())
             .then(res => {
                 if(res.success) {
-                    if (typeof showMessage === 'function') showMessage("报告生成成功！", 3000, true);
+                    if (typeof showMessage === 'function') {
+                        live2d_settings.isLLMThinking = true;
+                        live2d_settings.isLLMWriting = true;
+                        showMessage("报告生成成功！", 3000, true);
+                        live2d_settings.isLLMThinking = false;
+                        live2d_settings.isLLMWriting = false;
+                    }
                     loadReportList();
                     window.location.href = getServerUrl() + "storage/user_report/html/" + res.filename;
                 } else {
@@ -734,6 +831,8 @@
             });
         });
 
+        setTimeout(initReportUI, 100);
+
         // 7. 切换到此 Tab 时自动加载数据 (懒加载)
         $('.settings-tab-item[data-tab="report"]').one('click', function() {
             loadReportList();
@@ -745,10 +844,19 @@
     // ==========================================
 
     // 提示词重置功能
-    $('#btn-reset-report-prompt').click(function() {
-        if(confirm("重置报告生成提示词？")) {
-            $('#report-prompt').val(default_settings.reportPrompt); 
-            live2d_settings.reportPrompt = default_settings.reportPrompt;
+    $('#btn-reset-current-prompt').click(function() {
+        let type = $('#prompt-type-select').val();
+        let typeName = type === 'steam' ? "Steam" : "日报/周报";
+        
+        if(confirm(`确定要重置【${typeName}】提示词模板吗？`)) {
+            let defaultVal = type === 'steam' ? default_settings.steamPrompt : default_settings.reportPrompt;
+            if(type === 'steam') {
+                live2d_settings.steamPrompt = default_settings.steamPrompt;
+                $('#report-prompt').val(default_settings.steamPrompt);
+            } else {
+                live2d_settings.reportPrompt = default_settings.reportPrompt;
+                $('#report-prompt').val(default_settings.reportPrompt);
+            }
             saveGlobalSettings();
         }
     });

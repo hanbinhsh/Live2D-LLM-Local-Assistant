@@ -360,6 +360,94 @@ def list_reports():
         files.sort(reverse=True) # 最新在前
     return {"files": files}
 
+#=========================================================
+# 报告生成
+#=========================================================
+def fetch_steam_profile(api_key, steam_id):
+    """对应 /steam_profile"""
+    if not api_key or not steam_id: return "未配置 Steam API Key 或 ID"
+    try:
+        url = f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={api_key}&steamids={steam_id}"
+        res = requests.get(url, timeout=10).json()
+        players = res.get("response", {}).get("players", [])
+        if not players: return "未找到该 Steam ID 的玩家信息。"
+        
+        p = players[0]
+        # 状态码映射
+        states = {0: "离线", 1: "在线", 2: "忙碌", 3: "离开", 4: "打盹", 5: "交易中", 6: "想玩游戏"}
+        state_str = states.get(p.get("personastate", 0), "未知")
+        
+        # 格式化输出
+        info = [
+            f"昵称: {p.get('personaname')}",
+            f"SteamID: {p.get('steamid')}",
+            f"当前状态: {state_str}",
+            f"个人主页: {p.get('profileurl')}",
+            f"头像url: {p.get('avatarfull')}",
+            f"最后登录: {datetime.datetime.fromtimestamp(p.get('lastlogoff', 0)).strftime('%Y-%m-%d %H:%M') if p.get('lastlogoff') else '未知'}"
+        ]
+        if "gameextrainfo" in p:
+            info.append(f"正在游玩: {p['gameextrainfo']}")
+            
+        return "\n".join(info)
+    except Exception as e:
+        return f"获取个人资料失败: {e}"
+
+def fetch_steam_recent(api_key, steam_id):
+    """对应 /steam_recent_games"""
+    if not api_key or not steam_id: return "未配置 Steam API Key 或 ID"
+    try:
+        url = f"http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key={api_key}&steamid={steam_id}&format=json"
+        res = requests.get(url, timeout=10).json()
+        games = res.get("response", {}).get("games", [])
+        
+        if not games: return "最近两周没有游玩记录。"
+        
+        lines = []
+        for g in games:
+            name = g.get("name", "Unknown")
+            time_2w = round(g.get("playtime_2weeks", 0) / 60, 1)
+            time_total = round(g.get("playtime_forever", 0) / 60, 1)
+            lines.append(f"- {name}: 近期{time_2w}小时 (总计{time_total}小时)")
+            
+        return "\n".join(lines)
+    except Exception as e:
+        return f"获取近期游戏失败: {e}"
+
+def fetch_steam_owned(api_key, steam_id):
+    """对应 /steam_games (GetOwnedGames)"""
+    if not api_key or not steam_id: return "未配置 Steam API Key 或 ID"
+    try:
+        # 必须加 include_appinfo=1 才能拿到游戏名，否则只有 appid
+        url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&format=json&include_appinfo=1&include_played_free_games=1"
+        res = requests.get(url, timeout=15).json()
+        response = res.get("response", {})
+        count = response.get("game_count", 0)
+        games = response.get("games", [])
+        
+        if not games: return f"库存游戏数: {count} (列表为空或隐私设置隐藏)"
+        
+        # 为了防止 Prompt 太长，我们按游玩时间降序排序，并只取前 50 个
+        # 如果需要全部，大模型上下文可能会爆
+        games.sort(key=lambda x: x.get("playtime_forever", 0), reverse=True)
+        
+        lines = [f"库存总数: {count} 款", "游玩时长 Top 50:"]
+        
+        for g in games[:50]:
+            name = g.get("name", "Unknown")
+            time_total = round(g.get("playtime_forever", 0) / 60, 1)
+            if time_total > 0:
+                lines.append(f"- {name}: {time_total}小时")
+            else:
+                lines.append(f"- {name}: 未游玩")
+                
+        if len(games) > 50:
+            lines.append(f"... (还有 {len(games)-50} 款游戏未列出)")
+            
+        return "\n".join(lines)
+    except Exception as e:
+        return f"获取库存游戏失败: {e}"
+
 # 4. 生成报告 (核心)
 @app.post("/report/generate")
 def generate_report_llm(req: dict):
@@ -447,13 +535,6 @@ def generate_report_llm(req: dict):
     final_prompt = re.sub(r"/data(?::(\d+))?", replace_data_tag, user_prompt)
     final_prompt = re.sub(r"/chat_context(?::(\d+))?", replace_chat_tag, final_prompt)
 
-    # === 5. 兜底逻辑 ===
-    # 如果用户自己写了 Prompt 但完全忘记加占位符，为了防止数据丢失，强制追加在末尾
-    if "/data" not in user_prompt:
-        final_prompt += "\n\n【补充数据】:\n" + format_activity(30)
-    if "/chat_context" not in user_prompt:
-        final_prompt += "\n\n【补充聊天】:\n" + format_chat(10)
-
     # 6. 调用 LLM
     try:
         payload = {
@@ -464,7 +545,7 @@ def generate_report_llm(req: dict):
         }
         
         print("[Report] Prompt Constructed. Requesting LLM...")
-        print("[Report] Prompt：", final_prompt)
+        # print("[Report] Prompt：", final_prompt)
         response = requests.post(OLLAMA_API, json=payload)
         result = response.json()
         

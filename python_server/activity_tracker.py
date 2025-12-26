@@ -97,19 +97,45 @@ class ActivityTracker:
 
             try:
                 app_name, title = self.get_active_window_info()
+                
                 if app_name and title:
                     now = time.time()
                     dt = datetime.datetime.fromtimestamp(now)
                     date_str = dt.strftime("%Y-%m-%d")
                     time_str = dt.strftime("%H:%M:%S")
 
-                    # 简单聚合：如果上一条记录(5秒前)是同一个APP和Title，则直接增加时长
-                    # 这里为了简化代码，先直接插入，查询时再聚合
+                    # 1. 查询最后一条记录
                     cursor.execute('''
-                        INSERT INTO activities (timestamp, date_str, time_str, app_name, window_title, duration)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (now, date_str, time_str, app_name, title, 5))
+                        SELECT id, app_name, window_title, date_str 
+                        FROM activities 
+                        ORDER BY id DESC LIMIT 1
+                    ''')
+                    last_row = cursor.fetchone()
+
+                    is_merged = False
+                    
+                    if last_row:
+                        last_id, last_app, last_title, last_date = last_row
+                        
+                        # 2. 判断逻辑：应用名相同 AND 标题相同 AND 日期相同（防止跨天聚合）
+                        if last_app == app_name and last_title == title and last_date == date_str:
+                            # 3. 更新操作：只增加时长
+                            cursor.execute('''
+                                UPDATE activities 
+                                SET duration = duration + 5 
+                                WHERE id = ?
+                            ''', (last_id,))
+                            is_merged = True
+
+                    # 4. 插入操作：如果无法合并（不同程序、不同标题、或第一条记录）
+                    if not is_merged:
+                        cursor.execute('''
+                            INSERT INTO activities (timestamp, date_str, time_str, app_name, window_title, duration)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ''', (now, date_str, time_str, app_name, title, 5))
+                    
                     conn.commit()
+
             except Exception as e:
                 print(f"[Tracker] Error: {e}")
             

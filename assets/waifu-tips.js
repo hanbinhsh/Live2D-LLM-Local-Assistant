@@ -294,6 +294,7 @@ function initModel(waifuPath, type) {
         if (key === 'showLLM') toggleBtn($('.waifu-tool .fui-star'), val); 
         if (key === 'showHistory') toggleBtn($('.waifu-tool .fui-mail'), val); 
         if (key === 'showPeek') toggleBtn($('.waifu-tool .fui-video'), val); 
+        if (key === 'showReport') toggleBtn($('.waifu-tool .fui-calendar-solid'), val); 
         if (key === 'showSettings') toggleBtn($('.waifu-tool .fui-gear'), val); 
         
         // 样式微调
@@ -304,6 +305,11 @@ function initModel(waifuPath, type) {
             }
         }
     }
+
+    // 点击报告按钮
+    $(document).on('click', '.waifu-tool .fui-calendar-solid', function() {
+        $('#btn-gen-report').click();
+    });
 
     // --- 图片上传逻辑 ---
     var currentImageUrl = null;    // 存储服务器上的 URL (用于展示和存入历史)
