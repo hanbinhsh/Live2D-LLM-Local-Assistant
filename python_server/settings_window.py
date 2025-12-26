@@ -60,7 +60,7 @@ class SettingsWindow(QWidget):
         layout_sys.addWidget(self.chk_startup)
 
         # 活动记录开关
-        self.chk_record = QCheckBox("后台活动记录 (生成日报)")
+        self.chk_record = QCheckBox("后台活动记录")
         self.chk_record.setToolTip("记录前台窗口标题和时长，用于生成日报。\n数据仅保存在本地 storage/activity_log.db 中。")
         self.chk_record.setChecked(self.cfg.get("record_activity", True))
         self.chk_record.toggled.connect(self.on_record_change)
