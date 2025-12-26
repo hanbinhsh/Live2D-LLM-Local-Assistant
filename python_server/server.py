@@ -332,14 +332,9 @@ async def export_history_to_file(req: dict):
         return {"success": True, "path": filepath}
     except Exception as e:
         return {"success": False, "error": str(e)}
-    
-# 1. 报告配置开关
-@app.post("/report/config")
-def set_report_config(req: dict):
-    # req: {"enabled": bool, "prompt": str}
-    tracker.config.update(req)
-    return {"success": True}
-
+#=========================================================
+# 报告生成
+#=========================================================
 # 2. 数据查看
 @app.get("/report/data")
 def get_report_data(page: int = 1, size: int = 20, search: str = ""):
@@ -360,9 +355,6 @@ def list_reports():
         files.sort(reverse=True) # 最新在前
     return {"files": files}
 
-#=========================================================
-# 报告生成
-#=========================================================
 def fetch_steam_profile(api_key, steam_id):
     """对应 /steam_profile"""
     if not api_key or not steam_id: return "未配置 Steam API Key 或 ID"
@@ -408,13 +400,19 @@ def fetch_steam_recent(api_key, steam_id):
             name = g.get("name", "Unknown")
             time_2w = round(g.get("playtime_2weeks", 0) / 60, 1)
             time_total = round(g.get("playtime_forever", 0) / 60, 1)
-            lines.append(f"- {name}: 近期{time_2w}小时 (总计{time_total}小时)")
+            icon_hash = g.get("img_icon_url")
+            appid = g.get("appid")
+            if appid:
+                if icon_hash:
+                    icon_url = f"http://media.steampowered.com/steamcommunity/public/images/apps/{appid}/{icon_hash}.jpg"
+                header_url = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg"
+            lines.append(f"- {name}: 近期{time_2w}小时 (总计{time_total}小时) 图标url: {icon_url} 横板封面url: {header_url}")
             
         return "\n".join(lines)
     except Exception as e:
         return f"获取近期游戏失败: {e}"
 
-def fetch_steam_owned(api_key, steam_id):
+def fetch_steam_owned(api_key, steam_id, limit=50):
     """对应 /steam_games (GetOwnedGames)"""
     if not api_key or not steam_id: return "未配置 Steam API Key 或 ID"
     try:
@@ -430,19 +428,22 @@ def fetch_steam_owned(api_key, steam_id):
         # 为了防止 Prompt 太长，我们按游玩时间降序排序，并只取前 50 个
         # 如果需要全部，大模型上下文可能会爆
         games.sort(key=lambda x: x.get("playtime_forever", 0), reverse=True)
-        
-        lines = [f"库存总数: {count} 款", "游玩时长 Top 50:"]
-        
-        for g in games[:50]:
+        lines = [f"库存总数: {count} 款", f"游玩时长 Top {limit}:"]
+
+        for g in games[:limit]:
             name = g.get("name", "Unknown")
             time_total = round(g.get("playtime_forever", 0) / 60, 1)
+            icon_hash = g.get("img_icon_url")
+            appid = g.get("appid")
+            if icon_hash and appid:
+                icon_url = f"http://media.steampowered.com/steamcommunity/public/images/apps/{appid}/{icon_hash}.jpg"
             if time_total > 0:
-                lines.append(f"- {name}: {time_total}小时")
+                lines.append(f"- {name}: {time_total}小时 图标url：{icon_url}")
             else:
-                lines.append(f"- {name}: 未游玩")
+                lines.append(f"- {name}: 未游玩 图标url：{icon_url}")
                 
-        if len(games) > 50:
-            lines.append(f"... (还有 {len(games)-50} 款游戏未列出)")
+        if len(games) > limit:
+            lines.append(f"... (还有 {len(games)-limit} 款游戏未列出)")
             
         return "\n".join(lines)
     except Exception as e:
@@ -451,7 +452,7 @@ def fetch_steam_owned(api_key, steam_id):
 # 4. 生成报告 (核心)
 @app.post("/report/generate")
 def generate_report_llm(req: dict):
-    # req: { "model": str, "type": "daily/weekly/sql", "sql": str, "chat_history": list/str, "prompt_template": str }
+    # req: { "model": str, "type": "daily/weekly/sql", "sql": str, "chat_history": list/str, "prompt_template": str, "steam_id": str, "steam_api_key": str }
     
     # 1. 获取活动数据 (Database)
     db_result = tracker.execute_query_for_report(req.get("type"), req.get("sql"))
@@ -469,26 +470,48 @@ def generate_report_llm(req: dict):
     else:
         chat_list = raw_history
 
+    report_type = req.get("type")
+    user_prompt = req.get("prompt_template")
+
     # 3. 获取并预处理提示词模板
     user_prompt = req.get("prompt_template")
     if not user_prompt or not user_prompt.strip():
         # 默认模板 (如果用户没填)
-        user_prompt = """
-        你是一个贴心的桌面看板娘。请根据以下信息生成一份HTML日报/周报。
-        
-        【用户活动数据】:
-        /data:50
-        
-        【近期聊天话题】:
-        /chat_context:10
-        
-        要求：
-        1. 返回纯 HTML 代码，不要包含 Markdown 标记（如 ```html）。
-        2. 必须包含 CSS 样式，界面要现代、可爱。
-        3. 总结用户的活动（工作了多久，玩了多久）。
-        4. 结合聊天记录，给出一份“用户画像”或“心情分析”。
-        5. 【重要】如果可以，请在 HTML 中嵌入简单的可视化图表来可视化数据（如饼图、雷达图或条形图）。
-        """
+        if report_type == "steam":
+            user_prompt = """
+            你是一个游戏搭子兼看板娘。请根据用户的【Steam游戏记录】和【日常活动】，生成一份游戏分析报告。
+
+            【Steam数据】:
+            /steam_profile
+            /steam_recent_games
+            /steam_games:50
+
+            【电脑活动】:
+            /data:30
+
+            要求：
+            1. 输出纯 HTML 代码，风格要赛博朋克或二次元游戏风。
+            2. 分析用户的游戏偏好（FPS/RPG/策略等）。
+            3. 如果用户最近玩游戏时间很长，吐槽一下他的肝度。
+            4. 结合电脑活动，看看他是在摸鱼打游戏还是休息时间打游戏。
+            """
+        else:
+            user_prompt = """
+            你是一个贴心的桌面看板娘。请根据以下信息生成一份HTML日报/周报。
+            
+            【用户活动数据】:
+            /data:50
+            
+            【近期聊天话题】:
+            /chat_context:10
+            
+            要求：
+            1. 返回纯 HTML 代码，不要包含 Markdown 标记（如 ```html）。
+            2. 必须包含 CSS 样式，界面要现代、可爱。
+            3. 总结用户的活动（工作了多久，玩了多久）。
+            4. 结合聊天记录，给出一份“用户画像”或“心情分析”。
+            5. 【重要】如果可以，请在 HTML 中嵌入简单的可视化图表来可视化数据（如饼图、雷达图或条形图）。
+            """
 
     # === 4. 占位符解析与替换逻辑 (核心) ===
     
@@ -518,22 +541,36 @@ def generate_report_llm(req: dict):
                 lines.append(str(msg))
         return "\n".join(lines)
 
-    # 正则替换逻辑
-    # 匹配 /data 或 /data:数字
+    steam_id = req.get("steam_id")
+    api_key = req.get("steam_api_key")
+    print("正在获取信息:", steam_id, api_key)
+
     def replace_data_tag(match):
-        # 获取冒号后面的数字，如果没写默认 50
         count = int(match.group(1)) if match.group(1) else 50
         return format_activity(count)
 
-    # 匹配 /chat_context 或 /chat_context:数字
     def replace_chat_tag(match):
-        # 获取冒号后面的数字，如果没写默认 20
         count = int(match.group(1)) if match.group(1) else 20
         return format_chat(count)
+
+    def replace_steam_games_tag(match):
+        count = int(match.group(1)) if match.group(1) else 50
+        print(f"[Report] Fetching Steam Owned Games for {steam_id}, limit={count}")
+        return fetch_steam_owned(api_key, steam_id, count)
+    
+    def replace_steam_profile(match):
+        return fetch_steam_profile(api_key, steam_id)
+    
+    def replace_steam_recent(match):
+        return fetch_steam_recent(api_key, steam_id)
+    
 
     # 开始替换
     final_prompt = re.sub(r"/data(?::(\d+))?", replace_data_tag, user_prompt)
     final_prompt = re.sub(r"/chat_context(?::(\d+))?", replace_chat_tag, final_prompt)
+    final_prompt = re.sub(r"/steam_games(?::(\d+))?", replace_steam_games_tag, final_prompt)
+    final_prompt = re.sub(r"/steam_profile", replace_steam_profile, final_prompt)
+    final_prompt = re.sub(r"/steam_recent_games", replace_steam_recent, final_prompt)
 
     # 6. 调用 LLM
     try:
@@ -545,7 +582,7 @@ def generate_report_llm(req: dict):
         }
         
         print("[Report] Prompt Constructed. Requesting LLM...")
-        # print("[Report] Prompt：", final_prompt)
+        print("[Report] Prompt：", final_prompt)
         response = requests.post(OLLAMA_API, json=payload)
         result = response.json()
         

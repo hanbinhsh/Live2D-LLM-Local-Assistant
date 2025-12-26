@@ -301,13 +301,15 @@
                     <option value="general">日报/周报模板</option>
                     <option value="steam">Steam 报告模板</option>
                 </select>
-                <span style="font-size:10px; color:#888; font-weight:normal;">
-                    支持占位符: <code style="background:#eee;">/data:50</code> (插入50条活动数据), 
-                    <code style="background:#eee;">/chat_context:20</code> (插入20条对话),
-                    <code style="background:#eee;">/steam_content</code> (steam游戏数据)
-                </span>
                 <button id="btn-reset-current-prompt" class="waifu-btn secondary">重置</button>
             </label>
+            <span style="font-size:10px; color:#888; font-weight:normal;">
+                支持占位符: <code style="background:#eee;">/data:50</code> (插入50条活动数据), 
+                <code style="background:#eee;">/chat_context:20</code> (插入20条对话),
+                <code style="background:#eee;">/steam_profile</code> (steam个人资料),
+                <code style="background:#eee;">/steam_recent_games</code> (steam近期游戏数据),
+                <code style="background:#eee;">/steam_games:50</code> (插入50条steam库存),
+            </span>
             <textarea id="report-prompt" class="waifu-textarea config-item"></textarea>
         </div>
         
