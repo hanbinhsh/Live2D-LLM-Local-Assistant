@@ -16,6 +16,7 @@ import datetime
 from fastapi.staticfiles import StaticFiles
 from activity_tracker import tracker
 import json
+import time
 
 app = FastAPI()
 
@@ -388,66 +389,93 @@ def fetch_steam_profile(api_key, steam_id):
 def fetch_steam_recent(api_key, steam_id):
     """对应 /steam_recent_games"""
     if not api_key or not steam_id: return "未配置 Steam API Key 或 ID"
-    try:
-        url = f"http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key={api_key}&steamid={steam_id}&format=json"
-        res = requests.get(url, timeout=10).json()
-        games = res.get("response", {}).get("games", [])
-        
-        if not games: return "最近两周没有游玩记录。"
-        
-        lines = []
-        for g in games:
-            name = g.get("name", "Unknown")
-            time_2w = round(g.get("playtime_2weeks", 0) / 60, 1)
-            time_total = round(g.get("playtime_forever", 0) / 60, 1)
-            icon_hash = g.get("img_icon_url")
-            appid = g.get("appid")
-            if appid:
-                if icon_hash:
-                    icon_url = f"http://media.steampowered.com/steamcommunity/public/images/apps/{appid}/{icon_hash}.jpg"
-                header_url = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg"
-            lines.append(f"- {name}: 近期{time_2w}小时 (总计{time_total}小时) 图标url: {icon_url} 横板封面url: {header_url}")
+    
+    # [修改] 定义最大重试次数和最后一次的错误信息
+    max_retries = 3
+    last_error = ""
+
+    # [修改] 增加循环重试机制
+    for attempt in range(max_retries):
+        try:
+            url = f"http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key={api_key}&steamid={steam_id}&format=json"
+            res = requests.get(url, timeout=10)
+            if res.status_code != 200:
+                raise Exception(f"HTTP {res.status_code}, 内容: {res.text[:100]}")
+            try:
+                data = res.json()
+            except Exception:
+                raise Exception(f"Steam API 返回了非 JSON 数据: {res.text[:100]}")
+            games = data.get("response", {}).get("games", [])
+            if not games: return "最近两周没有游玩记录 (或隐私设置未公开)。"
             
-        return "\n".join(lines)
-    except Exception as e:
-        return f"获取近期游戏失败: {e}"
+            lines = []
+            for g in games:
+                name = g.get("name", "Unknown")
+                time_2w = round(g.get("playtime_2weeks", 0) / 60, 1)
+                time_total = round(g.get("playtime_forever", 0) / 60, 1)
+                icon_hash = g.get("img_icon_url")
+                appid = g.get("appid")
+                icon_url = "无"
+                header_url = "无"
+                
+                if appid:
+                    header_url = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg"
+                    if icon_hash:
+                        icon_url = f"http://media.steampowered.com/steamcommunity/public/images/apps/{appid}/{icon_hash}.jpg"
+                
+                lines.append(f"- {name}: 近期{time_2w}小时 (总计{time_total}小时) 图标url: {icon_url} 横板封面url: {header_url}")
+            return "\n".join(lines)
+
+        except Exception as e:
+            last_error = str(e)
+            print(f"[Steam API] Recent Attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2)
+    return f"获取近期游戏失败 (重试3次后): {last_error}"
 
 def fetch_steam_owned(api_key, steam_id, limit=50):
     """对应 /steam_games (GetOwnedGames)"""
     if not api_key or not steam_id: return "未配置 Steam API Key 或 ID"
-    try:
-        # 必须加 include_appinfo=1 才能拿到游戏名，否则只有 appid
-        url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&format=json&include_appinfo=1&include_played_free_games=1"
-        res = requests.get(url, timeout=15).json()
-        response = res.get("response", {})
-        count = response.get("game_count", 0)
-        games = response.get("games", [])
-        
-        if not games: return f"库存游戏数: {count} (列表为空或隐私设置隐藏)"
-        
-        # 为了防止 Prompt 太长，我们按游玩时间降序排序，并只取前 50 个
-        # 如果需要全部，大模型上下文可能会爆
-        games.sort(key=lambda x: x.get("playtime_forever", 0), reverse=True)
-        lines = [f"库存总数: {count} 款", f"游玩时长 Top {limit}:"]
-
-        for g in games[:limit]:
-            name = g.get("name", "Unknown")
-            time_total = round(g.get("playtime_forever", 0) / 60, 1)
-            icon_hash = g.get("img_icon_url")
-            appid = g.get("appid")
-            if icon_hash and appid:
-                icon_url = f"http://media.steampowered.com/steamcommunity/public/images/apps/{appid}/{icon_hash}.jpg"
-            if time_total > 0:
-                lines.append(f"- {name}: {time_total}小时 图标url：{icon_url}")
-            else:
-                lines.append(f"- {name}: 未游玩 图标url：{icon_url}")
-                
-        if len(games) > limit:
-            lines.append(f"... (还有 {len(games)-limit} 款游戏未列出)")
-            
-        return "\n".join(lines)
-    except Exception as e:
-        return f"获取库存游戏失败: {e}"
+    max_retries = 3
+    last_error = ""
+    for attempt in range(max_retries):
+        try:
+            url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&format=json&include_appinfo=1&include_played_free_games=1"
+            res = requests.get(url, timeout=15)
+            if res.status_code != 200:
+                raise Exception(f"HTTP {res.status_code}, 内容: {res.text[:100]}")
+            try:
+                data = res.json()
+            except Exception:
+                raise Exception(f"Steam API 返回了非 JSON 数据: {res.text[:100]}")
+            response = data.get("response", {})
+            count = response.get("game_count", 0)
+            games = response.get("games", [])
+            if not games: return f"库存游戏数: {count} (列表为空或隐私设置隐藏)"
+            games.sort(key=lambda x: x.get("playtime_forever", 0), reverse=True)
+            actual_limit = min(limit, len(games))
+            lines = [f"库存总数: {count} 款", f"游玩时长 Top {actual_limit}:"]
+            for g in games[:limit]:
+                name = g.get("name", "Unknown")
+                time_total = round(g.get("playtime_forever", 0) / 60, 1)
+                icon_hash = g.get("img_icon_url")
+                appid = g.get("appid")
+                icon_url = "无"
+                if icon_hash and appid:
+                    icon_url = f"http://media.steampowered.com/steamcommunity/public/images/apps/{appid}/{icon_hash}.jpg"
+                if time_total > 0:
+                    lines.append(f"- {name}: {time_total}小时 图标url：{icon_url}")
+                else:
+                    lines.append(f"- {name}: 未游玩 图标url：{icon_url}")
+            if len(games) > limit:
+                lines.append(f"... (还有 {len(games)-limit} 款游戏未列出)")
+            return "\n".join(lines)
+        except Exception as e:
+            last_error = str(e)
+            print(f"[Steam API] Owned Attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2)
+    return f"获取库存游戏失败 (重试3次后): {last_error}"
 
 # 4. 生成报告 (核心)
 @app.post("/report/generate")
@@ -470,14 +498,14 @@ def generate_report_llm(req: dict):
     else:
         chat_list = raw_history
 
-    report_type = req.get("type")
     user_prompt = req.get("prompt_template")
+    report_category = req.get("report_category", "activity")
 
     # 3. 获取并预处理提示词模板
     user_prompt = req.get("prompt_template")
     if not user_prompt or not user_prompt.strip():
         # 默认模板 (如果用户没填)
-        if report_type == "steam":
+        if report_category == "steam":
             user_prompt = """
             你是一个游戏搭子兼看板娘。请根据用户的【Steam游戏记录】和【日常活动】，生成一份游戏分析报告。
 
@@ -507,7 +535,7 @@ def generate_report_llm(req: dict):
             
             要求：
             1. 返回纯 HTML 代码，不要包含 Markdown 标记（如 ```html）。
-            2. 必须包含 CSS 样式，界面要现代、可爱。
+            2. 界面要现代、可爱。
             3. 总结用户的活动（工作了多久，玩了多久）。
             4. 结合聊天记录，给出一份“用户画像”或“心情分析”。
             5. 【重要】如果可以，请在 HTML 中嵌入简单的可视化图表来可视化数据（如饼图、雷达图或条形图）。
@@ -578,10 +606,17 @@ def generate_report_llm(req: dict):
             "model": req.get("model"),
             "prompt": final_prompt,
             "stream": False,
-            "options": {"num_ctx": 8192} # 增加上下文窗口以容纳更多数据
+            "options": {
+                "num_ctx": 128000,       # [建议] 如果显存允许，尽量调大上下文窗口，防止数据被截断导致模型困惑
+                # "repeat_penalty": 1.05,  # [核心修复] 重复惩罚 (默认是 1.0 或 1.1)，调高到 1.2 可以有效抑制复读
+                # "temperature": 0.7,      # [调整] 保持一定的创造性，避免过于死板导致陷入局部循环
+                # "top_k": 40,             # [新增] 标准采样参数
+                # "top_p": 0.8             # [新增] 标准采样参数
+            }
         }
         
         print("[Report] Prompt Constructed. Requesting LLM...")
+        print(f"[Report] Prompt Length: {len(final_prompt)}") 
         print("[Report] Prompt：", final_prompt)
         response = requests.post(OLLAMA_API, json=payload)
         result = response.json()

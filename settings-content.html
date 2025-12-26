@@ -259,16 +259,23 @@
             </div>
         </div>
 
-        <div class="setting-group" style="display:flex; gap:5px; margin-top:10px;">
-            <select id="report-type" class="waifu-select config-item" data-key="lastReportType" style="flex:1;">
-                <option value="daily">生成今日日报</option>
-                <option value="weekly">生成本周周报</option>
-                <option value="steam">生成 Steam 游戏报告</option>
-                <option value="sql">执行自定义 SQL</option>
+        <div class="setting-group" style="display:flex; gap:5px;">
+            <select id="report-category" data-key="reportCategory" class="waifu-select config-item" style="flex:1;">
+                <option value="activity">电脑活动报告</option>
+                <option value="steam">Steam 游戏报告</option>
+            </select>
+            <select id="report-type" data-key="lastReportType" class="waifu-select config-item" style="flex:1;">
+                <option value="daily">今日数据</option>
+                <option value="weekly">本周数据</option>
+                <option value="sql">自定义 SQL</option>
             </select>
         </div>
 
-        <div class="setting-section-title" style="margin-top:10px; font-size:12px; color:#409eff;">Steam 统计集成</div>
+        <!-- SQL 输入框 (仅当选择 SQL 时显示) -->
+        <div id="sql-container" style="display:none; margin-top:5px;">
+            <textarea id="report-sql" class="waifu-textarea" style="font-family:monospace; color:#2c3e50; max-width: 100%;" placeholder="SELECT app_name, SUM(duration) FROM activities GROUP BY app_name"></textarea>
+        </div>
+        <div class="setting-section-title">Steam 统计集成</div>
         <div class="setting-group" style="display:flex; gap:5px;">
             <div style="flex:1;">
                 <label class="setting-label" style="font-size:11px;">Steam ID (64位数字)</label>
@@ -311,11 +318,6 @@
                 <code style="background:#eee;">/steam_games:50</code> (插入50条steam库存),
             </span>
             <textarea id="report-prompt" class="waifu-textarea config-item"></textarea>
-        </div>
-        
-        <!-- SQL 输入框 (仅当选择 SQL 时显示) -->
-        <div id="sql-container" style="display:none; margin-top:5px;">
-            <textarea id="report-sql" class="waifu-textarea" style="font-family:monospace; color:#2c3e50;" placeholder="SELECT app_name, SUM(duration) FROM activities GROUP BY app_name"></textarea>
         </div>
         
         <!-- 4. 历史报告列表 -->
@@ -634,17 +636,20 @@
                 console.log("等待 live2d_settings 加载...");
                 setTimeout(initReportUI, 200); return;
             }
-            updatePromptTextarea();
+            updatePromptTextarea($('#report-category'));
         }
 
-        function updatePromptTextarea() {
-            let type = $('#prompt-type-select').val(); // 'general' or 'steam'
+        function updatePromptTextarea(btn) {
+            let type = $('#report-category').val();
+            if(btn!=="undefined"){
+                type = $(btn).val();
+            }
             let content = "";
             
             if (type === 'steam') {
                 content = live2d_settings.steamPrompt;
             } else {
-                content = live2d_settings.reportPrompt; // general
+                content = live2d_settings.reportPrompt;
             }
             
             // 如果为空，加载默认值
@@ -656,7 +661,7 @@
         }
 
         $('#prompt-type-select').change(function() {
-            updatePromptTextarea();
+            updatePromptTextarea(this);
         });
 
         $('#report-prompt').on('input propertychange', function() {
@@ -683,18 +688,21 @@
             let val = $(this).val();
             if(val === 'sql') $('#sql-container').show();
             else $('#sql-container').hide();
-            
-            // 自动切换提示词下拉框 (可选优化)
-            if (val === 'steam') {
-                $('#prompt-type-select').val('steam').trigger('change');
-            } else if (val === 'daily' || val === 'weekly') {
-                $('#prompt-type-select').val('general').trigger('change');
-            }
-
             // 保存选择
             live2d_settings.lastReportType = val;
             saveGlobalSettings();
         });
+
+        $('#report-category').change(function() {
+            let val = $(this).val();
+            if (val === 'steam') {
+                $('#prompt-type-select').val('steam').trigger('change');
+            } else {
+                $('#prompt-type-select').val('general').trigger('change');
+            }
+            live2d_settings.reportCategory = val; 
+            saveGlobalSettings();
+        })
 
         // 4. 数据表格加载
         function loadActivityData(page) {
@@ -766,7 +774,7 @@
 
         // 6. 生成报告
         $('#btn-gen-report').click(function() {
-            // 获取模型ID (优先使用报告专用模型)
+            // 获取模型
             let model = $('#model-report').val(); 
             // 如果没选报告模型，尝试用普通模型兜底
             if (!model && typeof live2d_settings !== 'undefined') {
@@ -794,16 +802,30 @@
             
             let historyStr = localStorage.getItem('waifu_chat_history') || "[]";
             let history = [];
-            try { history = JSON.parse(historyStr).slice(-100); } catch(e) {}
+            try { history = JSON.parse(historyStr); } catch(e) {}
+
+            let category = $('#report-category').val(); // activity 或 steam
+            let promptUsed = "";
+
+            if (category === 'steam') {
+                promptUsed = (typeof live2d_settings !== 'undefined' ? live2d_settings.steamPrompt : "") || $('#report-prompt').val();
+            } else {
+                promptUsed = (typeof live2d_settings !== 'undefined' ? live2d_settings.reportPrompt : "") || $('#report-prompt').val();
+            }
+
+            if ($('#prompt-type-select').val() === category) {
+                promptUsed = $('#report-prompt').val();
+            }
 
             let payload = {
                 model: model,
+                report_category: category,
                 type: $('#report-type').val(),
                 sql: $('#report-sql').val(),
                 chat_history: history,
                 steam_id: $('#steam-id').val(),
                 steam_api_key: $('#steam-key').val(),
-                prompt_template: $('#report-prompt').val()
+                prompt_template: promptUsed
             };
 
             fetch(getServerUrl() + 'report/generate', {
@@ -839,6 +861,8 @@
         $('.settings-tab-item[data-tab="report"]').one('click', function() {
             loadReportList();
             loadActivityData(1);
+            if($('#report-type').val() == "sql") $('#sql-container').show();
+            $('#report-category').change();
         });
     }
     // ==========================================
