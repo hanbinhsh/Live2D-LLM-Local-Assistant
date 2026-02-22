@@ -96,7 +96,7 @@ boot.vbs
 1.  **导入文件**：将您的模型文件夹拖入 `live2d_api-master/model/` 目录下。
 2.  **配置列表**：修改 `live2d_api-master/model/model_list.json` 文件（或 `static-api-file.json`），将新模型的路径添加进去。
 3.  **生成索引**：如果模型较多，可运行辅助脚本自动生成配置文件：
-    *   *需使用内置环境运行：* `runtime\python.exe gene-config-file.py`
+    *   *需使用内置环境运行(在live2d_api-master\model\目录下)：* `..\..\runtime\python.exe gene-config-file.py`
 4.  **刷新**：在软件设置面板或浏览器中刷新模型列表即可看到新模型。
 
 ---
