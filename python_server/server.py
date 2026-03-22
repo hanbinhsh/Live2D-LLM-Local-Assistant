@@ -1,13 +1,15 @@
 import base64
 import io
 import re
+import sys
 import win32gui
 import win32con
 import ctypes
 from PIL import Image, ImageGrab
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import requests
 import os
 import pyperclip
@@ -47,6 +49,11 @@ TARGET_SIZE = (1280, 720)
 # os.path.dirname(__file__) 是 python_server/
 # os.path.dirname(...) 是 root/
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
+from plugin.tts import get_tts_engine
+
 UPLOAD_DIR = os.path.join(PROJECT_ROOT, "storage", "image_upload")
 STORAGE_ROOT = os.path.join(PROJECT_ROOT, "storage")
 
@@ -66,6 +73,12 @@ class AnalyzeRequest(BaseModel):
     prompt: str = ""                # 自定义提示词
     mode: str = "roast"             # 'roast' (吐槽) 或 'chat' (聊天助手)
     model: str = ""                 # 前端指定使用的模型名称
+
+
+class TTSSpeakRequest(BaseModel):
+    text: str = ""
+    provider: str = "gpt_sovits"
+    settings: dict = Field(default_factory=dict)
 
 # === 窗口工具函数 ===
 def get_scaling_factor():
@@ -173,6 +186,60 @@ def list_models():
     except Exception as e:
         print(f"获取模型列表失败: {e}")
         return {"models": []}
+
+
+@app.post("/tts/speak")
+def tts_speak(req: TTSSpeakRequest):
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="TTS 文本不能为空")
+
+    provider = (req.provider or "").strip().lower()
+    if not provider:
+        raise HTTPException(status_code=400, detail="未配置 TTS 服务")
+
+    try:
+        engine = get_tts_engine(provider)
+        audio_bytes, media_type = engine.synthesize(text, req.settings or {})
+        return Response(
+            content=audio_bytes,
+            media_type=media_type or "audio/wav",
+            headers={"Cache-Control": "no-store"},
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        print(f"[TTS] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"TTS 合成失败: {e}")
+
+
+@app.post("/tts/stream")
+def tts_stream(req: TTSSpeakRequest):
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="TTS 文本不能为空")
+
+    provider = (req.provider or "").strip().lower()
+    if not provider:
+        raise HTTPException(status_code=400, detail="未配置 TTS 服务")
+
+    try:
+        engine = get_tts_engine(provider)
+        audio_stream, media_type = engine.synthesize_stream(text, req.settings or {})
+        return StreamingResponse(
+            audio_stream,
+            media_type=media_type or "application/octet-stream",
+            headers={"Cache-Control": "no-store"},
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        print(f"[TTS Stream] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"TTS 流式合成失败: {e}")
 
 @app.post("/see_and_roast")
 def see_and_roast(req: AnalyzeRequest):

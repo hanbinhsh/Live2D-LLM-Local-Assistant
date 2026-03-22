@@ -133,6 +133,167 @@
             <label class="setting-label">Python 后端地址 (Peek)</label>
             <input data-key="pythonServerUrl" class="waifu-select config-item" type="text" placeholder="http://127.0.0.1:11542/">
         </div>
+        <div class="setting-section-title" style="margin-top:15px;">TTS 语音播报</div>
+        <div class="setting-group checkbox-group">
+            <label><input data-key="ttsEnabled" class="config-item" type="checkbox"> 启用看板娘 TTS 播报</label>
+            <label><input data-key="ttsUseStreamingPlayback" class="config-item" type="checkbox"> 使用流式音频播放 (边下边播)</label>
+        </div>
+        <div class="setting-group">
+            <label class="setting-label">TTS 调用逻辑</label>
+            <select data-key="ttsPipelineMode" class="waifu-select config-item">
+                <option value="standard">等整段回复后再调用 TTS</option>
+                <option value="sentence_stream">LLM 流式断句并逐句送入 TTS</option>
+            </select>
+        </div>
+        <div class="setting-group">
+            <label class="setting-label">断句最短长度</label>
+            <input data-key="ttsSentenceMinLength" class="waifu-select config-item" type="number" step="1" placeholder="8">
+        </div>
+        <div class="setting-group">
+            <label class="setting-label">TTS 最大并发数</label>
+            <input data-key="ttsMaxParallelRequests" class="waifu-select config-item" type="number" step="1" placeholder="2">
+        </div>
+        <div class="setting-group">
+            <label class="setting-label">流式预缓冲块数</label>
+            <input data-key="ttsPrebufferChunks" class="waifu-select config-item" type="number" step="1" placeholder="3">
+        </div>
+        <div class="setting-group">
+            <label class="setting-label">流式预缓冲时长 (ms)</label>
+            <input data-key="ttsPrebufferMs" class="waifu-select config-item" type="number" step="10" placeholder="240">
+        </div>
+        <div class="setting-group">
+            <label class="setting-label">TTS 服务</label>
+            <select id="tts-service" data-key="ttsService" class="waifu-select config-item">
+                <option value="gpt_sovits">GPT-SoVITS</option>
+            </select>
+        </div>
+        <div class="setting-group">
+            <label class="setting-label">API 服务地址</label>
+            <input data-key="ttsApiUrl" class="waifu-select config-item" type="text" placeholder="http://127.0.0.1:9880">
+        </div>
+        <div class="setting-group">
+            <label class="setting-label">Key</label>
+            <input data-key="ttsApiKey" class="waifu-select config-item" type="password" placeholder="可留空">
+        </div>
+        <div id="tts-provider-gpt-sovits" style="display:none;">
+            <div class="setting-section-title" style="margin-top:15px;">GPT-SoVITS 参数</div>
+            <div class="setting-group">
+                <label class="setting-label">GPT 模型权重路径</label>
+                <input data-key="ttsGptModelPath" class="waifu-select config-item" type="text" placeholder="例如: D:\GPT-SoVITS\gpt.ckpt">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">SoVITS 模型权重路径</label>
+                <input data-key="ttsSovitsModelPath" class="waifu-select config-item" type="text" placeholder="例如: D:\GPT-SoVITS\sovits.pth">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">参考音频路径</label>
+                <input data-key="ttsRefAudioPath" class="waifu-select config-item" type="text" placeholder="例如: G:\voice\ref.ogg">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">参考音频对应的文本</label>
+                <input data-key="ttsRefPromptText" class="waifu-select config-item" type="text" placeholder="例如: では、行きましょうか">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">参考音频语种</label>
+                <input list="tts-lang-options" data-key="ttsRefPromptLang" class="waifu-select config-item" type="text" placeholder="zh / ja / en / auto">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">默认合成语种</label>
+                <input list="tts-lang-options" data-key="ttsDefaultTextLang" class="waifu-select config-item" type="text" placeholder="zh / ja / en / auto">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">长文本切分策略</label>
+                <input list="tts-split-methods" data-key="ttsTextSplitMethod" class="waifu-select config-item" type="text" placeholder="cut5">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">返回音频格式</label>
+                <select data-key="ttsMediaType" class="waifu-select config-item">
+                    <option value="wav">wav</option>
+                    <option value="raw">raw (后端自动封装为 wav)</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Top K</label>
+                <input data-key="ttsTopK" class="waifu-select config-item" type="number" step="1">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Top P</label>
+                <input data-key="ttsTopP" class="waifu-select config-item" type="number" step="0.01">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Temperature</label>
+                <input data-key="ttsTemperature" class="waifu-select config-item" type="number" step="0.01">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Batch Size</label>
+                <input data-key="ttsBatchSize" class="waifu-select config-item" type="number" step="1">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Batch Threshold</label>
+                <input data-key="ttsBatchThreshold" class="waifu-select config-item" type="number" step="0.01">
+            </div>
+            <div class="setting-group checkbox-group">
+                <label><input data-key="ttsSplitBucket" class="config-item" type="checkbox"> 启用 Split Bucket</label>
+                <label><input data-key="ttsParallelInfer" class="config-item" type="checkbox"> 启用并行推理</label>
+                <label><input data-key="ttsSuperSampling" class="config-item" type="checkbox"> 启用超采样</label>
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">全局语速调节</label>
+                <input data-key="ttsSpeedFactor" class="waifu-select config-item" type="number" step="0.05">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Fragment Interval</label>
+                <input data-key="ttsFragmentInterval" class="waifu-select config-item" type="number" step="0.05">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Seed</label>
+                <input data-key="ttsSeed" class="waifu-select config-item" type="number" step="1">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Repetition Penalty</label>
+                <input data-key="ttsRepetitionPenalty" class="waifu-select config-item" type="number" step="0.01">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Sample Steps</label>
+                <input data-key="ttsSampleSteps" class="waifu-select config-item" type="number" step="1">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Streaming Mode</label>
+                <select data-key="ttsStreamingMode" class="waifu-select config-item">
+                    <option value="false">关闭</option>
+                    <option value="1">1 - 高质量</option>
+                    <option value="2">2 - 中质量</option>
+                    <option value="3">3 - 快速</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Overlap Length</label>
+                <input data-key="ttsOverlapLength" class="waifu-select config-item" type="number" step="1">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Min Chunk Length</label>
+                <input data-key="ttsMinChunkLength" class="waifu-select config-item" type="number" step="1">
+            </div>
+            <div style="font-size:12px; color:#999; margin:-6px 0 12px 220px;">
+                通过 Python 后端代理调用 GPT-SoVITS，模型权重会在播报前自动切换。
+            </div>
+            <datalist id="tts-lang-options">
+                <option value="zh"></option>
+                <option value="ja"></option>
+                <option value="en"></option>
+                <option value="ko"></option>
+                <option value="yue"></option>
+                <option value="auto"></option>
+            </datalist>
+            <datalist id="tts-split-methods">
+                <option value="cut0"></option>
+                <option value="cut1"></option>
+                <option value="cut2"></option>
+                <option value="cut3"></option>
+                <option value="cut4"></option>
+                <option value="cut5"></option>
+            </datalist>
+        </div>
         <div class="setting-section-title" style="margin-top:15px;">
             模型选择
             <div style="float:right;"><button id="" class="waifu-btn secondary btn-refresh-models">刷新列表</button></div>

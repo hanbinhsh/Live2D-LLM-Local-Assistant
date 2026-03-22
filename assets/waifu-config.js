@@ -66,6 +66,42 @@ window.WAIFU_GLOBAL_DEFAULTS = {
     llmApiKey:          '',                                             // Key
     pythonServerUrl:    'http://127.0.0.1:11542/',                      // Python Server
 
+    // --- TTS 设置 ---
+    ttsEnabled:             false,                      // 是否启用 TTS 播报
+    ttsService:             'gpt_sovits',              // 当前 TTS 服务
+    ttsApiUrl:              'http://127.0.0.1:9880',  // TTS API 地址
+    ttsApiKey:              '',                        // TTS API Key
+    ttsGptModelPath:        '',                        // GPT 权重路径
+    ttsSovitsModelPath:     '',                        // SoVITS 权重路径
+    ttsRefAudioPath:        '',                        // 参考音频路径
+    ttsRefPromptText:       '',                        // 参考音频文本
+    ttsRefPromptLang:       'zh',                      // 参考音频语种
+    ttsDefaultTextLang:     'zh',                      // 默认合成语种
+    ttsTextSplitMethod:     'cut5',                    // 长文本切分策略
+    ttsMediaType:           'wav',                     // 返回音频格式
+    ttsTopK:                5,                         // top_k
+    ttsTopP:                1,                         // top_p
+    ttsTemperature:         1,                         // temperature
+    ttsBatchSize:           1,                         // batch_size
+    ttsBatchThreshold:      0.75,                      // batch_threshold
+    ttsSplitBucket:         true,                      // split_bucket
+    ttsSpeedFactor:         1.0,                       // 全局语速
+    ttsFragmentInterval:    0.3,                       // 片段间隔
+    ttsSeed:                -1,                        // 随机种子
+    ttsParallelInfer:       true,                      // 并行推理
+    ttsRepetitionPenalty:   1.35,                      // 重复惩罚
+    ttsSampleSteps:         32,                        // VITS V3 采样步数
+    ttsSuperSampling:       false,                     // 超采样
+    ttsStreamingMode:       'false',                   // 流式模式
+    ttsOverlapLength:       2,                         // overlap_length
+    ttsMinChunkLength:      16,                        // min_chunk_length
+    ttsUseStreamingPlayback:false,                     // 是否使用流式音频播放
+    ttsPipelineMode:        'standard',                // standard / sentence_stream
+    ttsSentenceMinLength:   8,                         // 断句最短长度
+    ttsMaxParallelRequests: 2,                         // TTS 并发请求数
+    ttsPrebufferChunks:     3,                         // 流式播放预缓冲块数
+    ttsPrebufferMs:         240,                       // 流式播放预缓冲时长(ms)
+
     // --- 自动吐槽设置 ---
     autoRoast:      false,          // 是否开启自动定时截图吐槽 (true: 开启, false: 关闭)
     roastInterval:  60000,          // 自动吐槽间隔 (单位: 毫秒)，300000 = 5分钟

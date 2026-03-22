@@ -34,11 +34,91 @@ $.getJSON(live2d_settings.staticAPIFile, function(result){
 
 // 终止模型思考
 var llmAbortController = null;
+var currentTTSAudio = null;
+var currentTTSObjectUrl = null;
+var currentTTSRequestId = 0;
+var currentTTSController = null;
+var currentPCMPlayer = null;
+var currentTTSDonePromise = Promise.resolve();
+var currentMessageToken = 0;
+var currentHideTimer = null;
+var sharedPCMAudioContext = null;
+var lastAudioPlaybackActivityAt = 0;
+var AUDIO_IDLE_COLD_START_MS = 20000;
+
+function trackCurrentTTSPromise(promise) {
+    currentTTSDonePromise = Promise.resolve(promise).catch(function() {});
+    return currentTTSDonePromise;
+}
+
+function getSharedPCMAudioContext() {
+    var AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) {
+        throw new Error('当前浏览器不支持 AudioContext');
+    }
+
+    if (!sharedPCMAudioContext || sharedPCMAudioContext.state === 'closed') {
+        sharedPCMAudioContext = new AudioContextCtor();
+    }
+
+    return sharedPCMAudioContext;
+}
+
+function getAudioIdleDurationMs() {
+    if (!lastAudioPlaybackActivityAt) return Number.POSITIVE_INFINITY;
+    return Date.now() - lastAudioPlaybackActivityAt;
+}
+
+function markAudioPlaybackActivity() {
+    lastAudioPlaybackActivityAt = Date.now();
+}
+
+function stopCurrentTTSAudio() {
+    if (currentTTSAudio) {
+        try {
+            currentTTSAudio.pause();
+            currentTTSAudio.currentTime = 0;
+        } catch (e) {}
+        currentTTSAudio = null;
+    }
+
+    if (currentTTSObjectUrl) {
+        URL.revokeObjectURL(currentTTSObjectUrl);
+        currentTTSObjectUrl = null;
+    }
+}
+
+function stopCurrentPCMPlayer() {
+    if (currentPCMPlayer) {
+        try {
+            currentPCMPlayer.stop();
+        } catch (e) {}
+        currentPCMPlayer = null;
+    }
+}
+
+function stopCurrentTTSFlow() {
+    currentTTSRequestId += 1;
+    trackCurrentTTSPromise(Promise.resolve());
+
+    if (currentTTSController) {
+        try {
+            currentTTSController.abort();
+        } catch (e) {}
+        currentTTSController = null;
+    }
+
+    stopCurrentTTSAudio();
+    stopCurrentPCMPlayer();
+}
+
 function stopLLMGeneration() {
     if (llmAbortController) {
         llmAbortController.abort(); // 1. 中止网络请求
         llmAbortController = null;
     }
+
+    stopCurrentTTSFlow();
     
     // 2. 重置状态锁
     live2d_settings.isLLMThinking = false; 
@@ -53,6 +133,734 @@ function stopLLMGeneration() {
 $(document).on('click', '.waifu-tool .fui-pause', function() {
     stopLLMGeneration();
 });
+
+function getPythonServerBaseUrl() {
+    var url = (live2d_settings.pythonServerUrl || 'http://127.0.0.1:11542/').trim();
+    if (url.slice(-1) !== '/') url += '/';
+    return url;
+}
+
+function cleanTextForTTS(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/\[[^\]]*\]\([^)]+\)/g, ' ')
+        .replace(/\n+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function buildTTSSettingsPayload() {
+    return {
+        ttsApiUrl: live2d_settings.ttsApiUrl,
+        ttsApiKey: live2d_settings.ttsApiKey,
+        ttsGptModelPath: live2d_settings.ttsGptModelPath,
+        ttsSovitsModelPath: live2d_settings.ttsSovitsModelPath,
+        ttsRefAudioPath: live2d_settings.ttsRefAudioPath,
+        ttsRefPromptText: live2d_settings.ttsRefPromptText,
+        ttsRefPromptLang: live2d_settings.ttsRefPromptLang,
+        ttsDefaultTextLang: live2d_settings.ttsDefaultTextLang,
+        ttsTextSplitMethod: live2d_settings.ttsTextSplitMethod,
+        ttsMediaType: live2d_settings.ttsMediaType,
+        ttsTopK: live2d_settings.ttsTopK,
+        ttsTopP: live2d_settings.ttsTopP,
+        ttsTemperature: live2d_settings.ttsTemperature,
+        ttsBatchSize: live2d_settings.ttsBatchSize,
+        ttsBatchThreshold: live2d_settings.ttsBatchThreshold,
+        ttsSplitBucket: live2d_settings.ttsSplitBucket,
+        ttsSpeedFactor: live2d_settings.ttsSpeedFactor,
+        ttsFragmentInterval: live2d_settings.ttsFragmentInterval,
+        ttsSeed: live2d_settings.ttsSeed,
+        ttsParallelInfer: live2d_settings.ttsParallelInfer,
+        ttsRepetitionPenalty: live2d_settings.ttsRepetitionPenalty,
+        ttsSampleSteps: live2d_settings.ttsSampleSteps,
+        ttsSuperSampling: live2d_settings.ttsSuperSampling,
+        ttsStreamingMode: live2d_settings.ttsStreamingMode,
+        ttsOverlapLength: live2d_settings.ttsOverlapLength,
+        ttsMinChunkLength: live2d_settings.ttsMinChunkLength
+    };
+}
+
+function buildTTSRequestSettings(options) {
+    var settings = buildTTSSettingsPayload();
+    options = options || {};
+    if (options.forceStreamingPlayback) {
+        settings.ttsMediaType = 'raw';
+        if (!settings.ttsStreamingMode || settings.ttsStreamingMode === 'false') {
+            settings.ttsStreamingMode = '2';
+        }
+    }
+    return settings;
+}
+
+function getTTSMinSentenceLength() {
+    var value = parseInt(live2d_settings.ttsSentenceMinLength, 10);
+    return isNaN(value) ? 8 : Math.max(1, value);
+}
+
+function getTTSMaxParallelRequests(useStreamingPlayback) {
+    var value = parseInt(live2d_settings.ttsMaxParallelRequests, 10);
+    if (isNaN(value) || value < 1) value = 2;
+    return value;
+}
+
+function getTTSPrebufferChunks() {
+    var value = parseInt(live2d_settings.ttsPrebufferChunks, 10);
+    return isNaN(value) ? 3 : Math.max(1, value);
+}
+
+function getTTSPrebufferMs() {
+    var value = parseInt(live2d_settings.ttsPrebufferMs, 10);
+    return isNaN(value) ? 240 : Math.max(60, value);
+}
+
+function getPCMUsableBytes(byteLength) {
+    if (!byteLength || byteLength < 2) return 0;
+    return byteLength - (byteLength % 2);
+}
+
+function extractSpeakableSentence(textBuffer) {
+    var majorPunctuationChars = ['。', '！', '？', '.', '!', '?', '\n'];
+    var minorPunctuationChars = ['，', '、', ','];
+    var minLength = getTTSMinSentenceLength();
+    var majorMinLength = Math.max(2, Math.min(minLength, 4));
+    var minorMinLength = Math.max(24, minLength * 4);
+    var splitIdx = -1;
+
+    for (var i = 0; i < textBuffer.length; i++) {
+        if (i >= majorMinLength && majorPunctuationChars.indexOf(textBuffer[i]) !== -1) {
+            splitIdx = i;
+            while (splitIdx + 1 < textBuffer.length && majorPunctuationChars.indexOf(textBuffer[splitIdx + 1]) !== -1) {
+                splitIdx += 1;
+            }
+            break;
+        }
+    }
+
+    if (splitIdx === -1 && textBuffer.length >= minorMinLength) {
+        for (var j = 0; j < textBuffer.length; j++) {
+            if (j >= minorMinLength && minorPunctuationChars.indexOf(textBuffer[j]) !== -1) {
+                splitIdx = j;
+                while (splitIdx + 1 < textBuffer.length && minorPunctuationChars.indexOf(textBuffer[splitIdx + 1]) !== -1) {
+                    splitIdx += 1;
+                }
+                break;
+            }
+        }
+    }
+
+    if (splitIdx === -1) return null;
+
+    return {
+        sentence: textBuffer.slice(0, splitIdx + 1).trim(),
+        rest: textBuffer.slice(splitIdx + 1)
+    };
+}
+
+function PCMStreamPlayer(options) {
+    options = options || {};
+    this.audioContext = getSharedPCMAudioContext();
+    this.sampleRate = options.sampleRate || 32000;
+    this.prebufferChunks = options.prebufferChunks || 3;
+    this.prebufferMs = options.prebufferMs || 240;
+    this.pendingChunks = [];
+    this.pendingBytes = 0;
+    this.sourceNodes = [];
+    this.nextStartTime = 0;
+    this.started = false;
+    this.closed = false;
+    this.initialLeadTime = options.initialLeadTime || 0.22;
+    this.minScheduleLead = options.minScheduleLead || 0.015;
+    this.prependSilenceMs = options.prependSilenceMs || 0;
+    this.hasPrependedSilence = false;
+    this.isColdStart = getAudioIdleDurationMs() >= AUDIO_IDLE_COLD_START_MS || this.audioContext.state === 'suspended';
+    this.bytesPerSecond = this.sampleRate * 2;
+    this.prebufferBytes = Math.max(2, Math.floor(this.bytesPerSecond * (this.prebufferMs / 1000)));
+
+    if (this.isColdStart) {
+        this.initialLeadTime = Math.max(this.initialLeadTime, 0.28);
+        this.prependSilenceMs = Math.max(this.prependSilenceMs, 90);
+        this.prebufferMs = Math.max(this.prebufferMs, 180);
+        this.prebufferBytes = Math.max(2, Math.floor(this.bytesPerSecond * (this.prebufferMs / 1000)));
+    }
+}
+
+PCMStreamPlayer.prototype.appendChunk = function(uint8Chunk) {
+    if (this.closed || !uint8Chunk || !uint8Chunk.length) return;
+
+    this.pendingChunks.push(uint8Chunk);
+    this.pendingBytes += getPCMUsableBytes(uint8Chunk.byteLength);
+    if (!this.started && this.pendingChunks.length >= this.prebufferChunks && this.pendingBytes >= this.prebufferBytes) {
+        this.flushPending();
+    } else if (this.started) {
+        this.flushPending();
+    }
+};
+
+PCMStreamPlayer.prototype.flushPending = function() {
+    if (this.closed || !this.pendingChunks.length) return;
+
+    if (!this.started) {
+        this.started = true;
+        this.nextStartTime = Math.max(this.audioContext.currentTime + this.initialLeadTime, this.nextStartTime);
+        if (this.audioContext.state === 'suspended') {
+            this.audioContext.resume().catch(function() {});
+        }
+        if (this.prependSilenceMs > 0 && !this.hasPrependedSilence) {
+            this.scheduleSilence(this.prependSilenceMs);
+            this.hasPrependedSilence = true;
+        }
+        markAudioPlaybackActivity();
+    }
+
+    while (this.pendingChunks.length) {
+        this.scheduleChunk(this.pendingChunks.shift());
+    }
+};
+
+PCMStreamPlayer.prototype.scheduleChunk = function(uint8Chunk) {
+    var usableLength = getPCMUsableBytes(uint8Chunk.byteLength);
+    if (usableLength <= 0) return;
+    this.pendingBytes = Math.max(0, this.pendingBytes - usableLength);
+
+    var pcm16 = new Int16Array(uint8Chunk.buffer, uint8Chunk.byteOffset, usableLength / 2);
+    var float32 = new Float32Array(pcm16.length);
+    for (var i = 0; i < pcm16.length; i++) {
+        float32[i] = Math.max(-1, Math.min(1, pcm16[i] / 32768));
+    }
+
+    var audioBuffer = this.audioContext.createBuffer(1, float32.length, this.sampleRate);
+    audioBuffer.copyToChannel(float32, 0);
+
+    var source = this.audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(this.audioContext.destination);
+
+    var startTime = Math.max(this.nextStartTime, this.audioContext.currentTime + this.minScheduleLead);
+    source.start(startTime);
+    this.nextStartTime = startTime + audioBuffer.duration;
+    this.sourceNodes.push(source);
+    markAudioPlaybackActivity();
+};
+
+PCMStreamPlayer.prototype.scheduleSilence = function(durationMs) {
+    if (!durationMs || durationMs <= 0) return;
+    var frameCount = Math.max(1, Math.floor(this.sampleRate * (durationMs / 1000)));
+    var audioBuffer = this.audioContext.createBuffer(1, frameCount, this.sampleRate);
+    var source = this.audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(this.audioContext.destination);
+
+    var startTime = Math.max(this.nextStartTime, this.audioContext.currentTime + this.minScheduleLead);
+    source.start(startTime);
+    this.nextStartTime = startTime + audioBuffer.duration;
+    this.sourceNodes.push(source);
+    markAudioPlaybackActivity();
+};
+
+PCMStreamPlayer.prototype.finish = function() {
+    this.flushPending();
+};
+
+PCMStreamPlayer.prototype.waitForDrain = function() {
+    if (this.closed) return Promise.resolve();
+    this.flushPending();
+    var delay = Math.max(0, (this.nextStartTime - this.audioContext.currentTime) * 1000 + 80);
+    return new Promise(function(resolve) {
+        window.setTimeout(resolve, delay);
+    });
+};
+
+PCMStreamPlayer.prototype.stop = function() {
+    if (this.closed) return;
+    this.closed = true;
+
+    this.sourceNodes.forEach(function(source) {
+        try { source.stop(); } catch (e) {}
+        try { source.disconnect(); } catch (e) {}
+    });
+    this.sourceNodes = [];
+    this.pendingChunks = [];
+    markAudioPlaybackActivity();
+};
+
+async function requestTTSAudioBlob(text, signal) {
+    var cleanedText = cleanTextForTTS(text);
+    if (!cleanedText) return null;
+
+    const response = await fetch(getPythonServerBaseUrl() + 'tts/speak', {
+        method: 'POST',
+        signal: signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            text: cleanedText,
+            provider: live2d_settings.ttsService,
+            settings: buildTTSRequestSettings()
+        })
+    });
+
+    if (!response.ok) {
+        let errorText = 'TTS 请求失败';
+        try {
+            const errorData = await response.json();
+            errorText = errorData.detail || errorData.error || errorText;
+        } catch (e) {}
+        throw new Error(errorText);
+    }
+
+    const blob = await response.blob();
+    if (!blob || !blob.size) {
+        throw new Error('TTS 服务没有返回音频数据');
+    }
+    return blob;
+}
+
+function playTTSAudioBlob(blob, requestId, signal) {
+    return new Promise(function(resolve, reject) {
+        if (!blob) return resolve();
+        if (requestId !== currentTTSRequestId) return resolve();
+        if (signal && signal.aborted) return resolve();
+
+        stopCurrentTTSAudio();
+
+        currentTTSObjectUrl = URL.createObjectURL(blob);
+        currentTTSAudio = new Audio(currentTTSObjectUrl);
+
+        var cleanup = function() {
+            if (signal) signal.removeEventListener('abort', onAbort);
+        };
+        var finish = function() {
+            cleanup();
+            stopCurrentTTSAudio();
+            resolve();
+        };
+        var fail = function(error) {
+            cleanup();
+            stopCurrentTTSAudio();
+            reject(error);
+        };
+        var onAbort = function() {
+            finish();
+        };
+
+        currentTTSAudio.onended = finish;
+        currentTTSAudio.onplay = function() {
+            markAudioPlaybackActivity();
+        };
+        currentTTSAudio.onerror = function() {
+            fail(new Error('音频播放失败'));
+        };
+
+        if (signal) signal.addEventListener('abort', onAbort, { once: true });
+
+        currentTTSAudio.play().catch(fail);
+    });
+}
+
+async function streamTTSAudio(text, signal, requestId) {
+    var cleanedText = cleanTextForTTS(text);
+    if (!cleanedText) return;
+
+    stopCurrentPCMPlayer();
+
+    const response = await fetch(getPythonServerBaseUrl() + 'tts/stream', {
+        method: 'POST',
+        signal: signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            text: cleanedText,
+            provider: live2d_settings.ttsService,
+            settings: buildTTSRequestSettings({ forceStreamingPlayback: true })
+        })
+    });
+
+    if (!response.ok) {
+        let errorText = 'TTS 流式请求失败';
+        try {
+            const errorData = await response.json();
+            errorText = errorData.detail || errorData.error || errorText;
+        } catch (e) {}
+        throw new Error(errorText);
+    }
+
+    if (!response.body) {
+        throw new Error('浏览器不支持流式音频读取');
+    }
+
+    var reader = response.body.getReader();
+    var player = new PCMStreamPlayer({
+        sampleRate: 32000,
+        prebufferChunks: getTTSPrebufferChunks(),
+        prebufferMs: getTTSPrebufferMs()
+    });
+    currentPCMPlayer = player;
+
+    try {
+        while (true) {
+            if (signal && signal.aborted) {
+                throw new DOMException('Aborted', 'AbortError');
+            }
+
+            const result = await reader.read();
+            if (result.done) break;
+            if (requestId !== currentTTSRequestId) break;
+            player.appendChunk(result.value);
+        }
+
+        player.finish();
+        await player.waitForDrain();
+    } finally {
+        try { reader.cancel(); } catch (e) {}
+        if (currentPCMPlayer === player) currentPCMPlayer = null;
+        player.stop();
+    }
+}
+
+function createSentenceTTSPipeline() {
+    var useStreamingPlayback = !!live2d_settings.ttsUseStreamingPlayback;
+    var controller = new AbortController();
+    var queue = [];
+    var sentenceJobs = {};
+    var nextEnqueueIndex = 0;
+    var nextPlayIndex = 0;
+    var activeCount = 0;
+    var finalized = false;
+    var finished = false;
+    var maxParallel = getTTSMaxParallelRequests(useStreamingPlayback);
+    var playerPromise;
+    var requestId = ++currentTTSRequestId;
+    var resolveDone;
+    var rejectDone;
+    var donePromise = new Promise(function(resolve, reject) {
+        resolveDone = resolve;
+        rejectDone = reject;
+    });
+
+    currentTTSController = controller;
+    stopCurrentTTSAudio();
+    stopCurrentPCMPlayer();
+
+    function sleep(ms) {
+        return new Promise(function(resolve) {
+            window.setTimeout(resolve, ms);
+        });
+    }
+
+    function shouldUseStreamingSentencePlayback(job) {
+        if (!useStreamingPlayback) return false;
+
+        var safeStreamingLength = Math.max(24, getTTSMinSentenceLength() * 3);
+        if (job.index === 0) return true;
+        if (job.text.length < safeStreamingLength) return false;
+        return true;
+    }
+
+    function getSentenceStreamConfig(job) {
+        var prebufferChunks = getTTSPrebufferChunks();
+        var prebufferMs = getTTSPrebufferMs();
+        var initialLeadTime = 0.22;
+        var minScheduleLead = 0.015;
+        var minorPauseMatches = job.text.match(/[、，,]/g);
+        var minorPauseCount = minorPauseMatches ? minorPauseMatches.length : 0;
+        var hasMinorPause = minorPauseCount > 0;
+        var hasEllipsis = /(\.\.\.|…+)/.test(job.text);
+        var isShortSentence = job.text.length <= Math.max(18, getTTSMinSentenceLength() * 2);
+        var prependSilenceMs = 0;
+
+        if (job.index === 0) {
+            prebufferChunks = Math.min(prebufferChunks, 2);
+            prebufferMs = Math.min(prebufferMs, 160);
+            initialLeadTime = 0.18;
+            minScheduleLead = 0.012;
+            prependSilenceMs = 45;
+        }
+
+        if (hasMinorPause && isShortSentence) {
+            prebufferChunks = Math.max(prebufferChunks, 3);
+            prebufferMs = Math.max(prebufferMs, 280);
+            initialLeadTime = Math.max(initialLeadTime, 0.2);
+        } else if (isShortSentence) {
+            prebufferChunks = Math.max(prebufferChunks, 2);
+            prebufferMs = Math.max(prebufferMs, 220);
+        }
+
+        if (minorPauseCount >= 2 || hasEllipsis) {
+            prebufferChunks = Math.max(prebufferChunks, 4);
+            prebufferMs = Math.max(prebufferMs, 300);
+            initialLeadTime = Math.max(initialLeadTime, 0.2);
+        } else if (hasMinorPause) {
+            prebufferChunks = Math.max(prebufferChunks, 3);
+            prebufferMs = Math.max(prebufferMs, 180);
+        }
+
+        return {
+            prebufferChunks: prebufferChunks,
+            prebufferMs: prebufferMs,
+            initialLeadTime: initialLeadTime,
+            minScheduleLead: minScheduleLead,
+            prependSilenceMs: prependSilenceMs
+        };
+    }
+
+    function maybeResolve() {
+        if (finished) return;
+        if (!finalized) return;
+        if (activeCount !== 0) return;
+        if (queue.length !== 0) return;
+        if (Object.keys(sentenceJobs).length !== 0) return;
+        if (nextPlayIndex !== nextEnqueueIndex) return;
+
+        finished = true;
+        Promise.resolve(playerPromise).then(function() {
+            resolveDone();
+        }).catch(rejectDone);
+    }
+
+    async function fetchStreamingSentence(job) {
+        const response = await fetch(getPythonServerBaseUrl() + 'tts/stream', {
+            method: 'POST',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: job.text,
+                provider: live2d_settings.ttsService,
+                settings: buildTTSRequestSettings({ forceStreamingPlayback: true })
+            })
+        });
+
+        if (!response.ok) {
+            let errorText = 'TTS 流式请求失败';
+            try {
+                const errorData = await response.json();
+                errorText = errorData.detail || errorData.error || errorText;
+            } catch (e) {}
+            throw new Error(errorText);
+        }
+
+        if (!response.body) {
+            throw new Error('浏览器不支持流式音频读取');
+        }
+
+        var reader = response.body.getReader();
+        try {
+            while (true) {
+                if (controller.signal.aborted) {
+                    throw new DOMException('Aborted', 'AbortError');
+                }
+
+                const result = await reader.read();
+                if (result.done) break;
+                if (requestId !== currentTTSRequestId) break;
+
+                if (result.value && result.value.length) {
+                    job.chunks.push(result.value);
+                    job.bufferedBytes += getPCMUsableBytes(result.value.byteLength);
+                }
+            }
+        } finally {
+            try { reader.cancel(); } catch (e) {}
+            job.done = true;
+        }
+    }
+
+    async function playStreamingSentence(job) {
+        var streamConfig = getSentenceStreamConfig(job);
+        console.log('[TTS Stream Config]', {
+            index: job.index,
+            text: job.text,
+            isColdStart: getAudioIdleDurationMs() >= AUDIO_IDLE_COLD_START_MS,
+            prebufferChunks: streamConfig.prebufferChunks,
+            prebufferMs: streamConfig.prebufferMs,
+            initialLeadTime: streamConfig.initialLeadTime,
+            minScheduleLead: streamConfig.minScheduleLead,
+            prependSilenceMs: streamConfig.prependSilenceMs
+        });
+        var player = new PCMStreamPlayer({
+            sampleRate: 32000,
+            prebufferChunks: streamConfig.prebufferChunks,
+            prebufferMs: streamConfig.prebufferMs,
+            initialLeadTime: streamConfig.initialLeadTime,
+            minScheduleLead: streamConfig.minScheduleLead,
+            prependSilenceMs: streamConfig.prependSilenceMs
+        });
+        currentPCMPlayer = player;
+        try {
+            while (true) {
+                if (controller.signal.aborted) return;
+
+                if (!job.startedPlayback) {
+                    var requiredChunks = streamConfig.prebufferChunks;
+                    var requiredBytes = Math.max(2, Math.floor((32000 * 2) * (streamConfig.prebufferMs / 1000)));
+                    if (!job.done && (job.chunks.length < requiredChunks || job.bufferedBytes < requiredBytes)) {
+                        await sleep(8);
+                        continue;
+                    }
+                    job.startedPlayback = true;
+                }
+
+                while (job.chunks.length) {
+                    var nextChunk = job.chunks.shift();
+                    job.bufferedBytes = Math.max(0, job.bufferedBytes - getPCMUsableBytes(nextChunk.byteLength));
+                    player.appendChunk(nextChunk);
+                }
+
+                if (job.done) {
+                    break;
+                }
+
+                await sleep(8);
+            }
+
+            player.finish();
+            await player.waitForDrain();
+        } finally {
+            if (currentPCMPlayer === player) currentPCMPlayer = null;
+            player.stop();
+        }
+    }
+
+    async function consumeSentencePlayback() {
+        try {
+            while (true) {
+                if (controller.signal.aborted) return;
+
+                var job = sentenceJobs[nextPlayIndex];
+                if (!job) {
+                    if (finalized && nextPlayIndex >= nextEnqueueIndex && activeCount === 0 && queue.length === 0) {
+                        break;
+                    }
+                    await sleep(8);
+                    continue;
+                }
+
+                if (job.playbackMode === 'stream') {
+                    await playStreamingSentence(job);
+                } else {
+                    while (!controller.signal.aborted && !job.blob && !job.done) {
+                        await sleep(8);
+                    }
+                    if (controller.signal.aborted) return;
+                    if (job.blob) {
+                        await playTTSAudioBlob(job.blob, requestId, controller.signal);
+                    }
+                }
+
+                delete sentenceJobs[nextPlayIndex];
+                nextPlayIndex += 1;
+                maybeResolve();
+            }
+        } catch (error) {
+            if (error && error.name !== 'AbortError') {
+                throw error;
+            }
+        }
+    }
+
+    async function runJob(job) {
+        try {
+            if (job.playbackMode === 'stream') {
+                await fetchStreamingSentence(job);
+            } else {
+                job.blob = await requestTTSAudioBlob(job.text, controller.signal);
+                job.done = true;
+            }
+        } catch (error) {
+            if (error && error.name !== 'AbortError') {
+                console.error('[TTS Pipeline] 句子合成失败:', error);
+            }
+            job.done = true;
+        } finally {
+            activeCount -= 1;
+            pump();
+            maybeResolve();
+        }
+    }
+
+    function pump() {
+        while (!controller.signal.aborted && activeCount < maxParallel && queue.length > 0) {
+            var job = queue.shift();
+            activeCount += 1;
+            runJob(job);
+        }
+    }
+
+    playerPromise = consumeSentencePlayback();
+
+    return {
+        enqueue: function(text) {
+            var cleanedText = cleanTextForTTS(text);
+            if (!cleanedText || controller.signal.aborted) return;
+            var job = {
+                index: nextEnqueueIndex,
+                text: cleanedText,
+                playbackMode: 'buffered',
+                chunks: [],
+                done: false,
+                startedPlayback: false,
+                bufferedBytes: 0,
+                blob: null
+            };
+            job.playbackMode = shouldUseStreamingSentencePlayback(job) ? 'stream' : 'buffered';
+            sentenceJobs[nextEnqueueIndex] = job;
+            queue.push(job);
+            nextEnqueueIndex += 1;
+            pump();
+        },
+        finish: function() {
+            finalized = true;
+            maybeResolve();
+        },
+        waitUntilDone: function() {
+            return donePromise;
+        },
+        abort: function() {
+            if (finished) return;
+            controller.abort();
+            finished = true;
+            stopCurrentTTSAudio();
+            stopCurrentPCMPlayer();
+            resolveDone();
+        }
+    };
+}
+
+async function speakMessageWithTTS(text) {
+    if (!live2d_settings.ttsEnabled) return;
+    if (!live2d_settings.ttsService) return;
+
+    var cleanedText = cleanTextForTTS(text);
+    if (!cleanedText) return;
+
+    stopCurrentTTSFlow();
+
+    var controller = new AbortController();
+    var requestId = ++currentTTSRequestId;
+    currentTTSController = controller;
+
+    var playbackPromise = (async function() {
+        if (live2d_settings.ttsUseStreamingPlayback) {
+            await streamTTSAudio(cleanedText, controller.signal, requestId);
+        } else {
+            var blob = await requestTTSAudioBlob(cleanedText, controller.signal);
+            await playTTSAudioBlob(blob, requestId, controller.signal);
+        }
+    })();
+    trackCurrentTTSPromise(playbackPromise);
+
+    try {
+        await playbackPromise;
+    } catch (error) {
+        if (error && error.name !== 'AbortError') {
+            console.error('[TTS] 播放失败:', error);
+        }
+    } finally {
+        if (currentTTSController === controller) {
+            currentTTSController = null;
+        }
+    }
+}
 
 function localAPI(action, modelID, texturesID=0){
     // modelID = modelID > 0 ? modelID-1 : 0;
@@ -184,9 +992,16 @@ function showMessage(text, timeout, flag) {
     if(flag || sessionStorage.getItem('waifu-text') === '' || sessionStorage.getItem('waifu-text') === null){
         if(Array.isArray(text)) text = text[Math.floor(Math.random() * text.length + 1)-1];
         if (live2d_settings.showF12Message) console.log('[Message]', text.replace(/<[^<>]+>/g,''));
+        currentMessageToken += 1;
+        var messageToken = currentMessageToken;
         
         if(flag) sessionStorage.setItem('waifu-text', text);
         
+        if (currentHideTimer) {
+            window.clearTimeout(currentHideTimer);
+            currentHideTimer = null;
+        }
+
         $('.waifu-tips').stop();
         $('.waifu-tips').html(text).fadeTo(200, 1);
         // 如果 timeout 是 0，表示不自动隐藏（思考中状态）
@@ -195,16 +1010,37 @@ function showMessage(text, timeout, flag) {
             $('.waifu-tips').stop().css('opacity', 1);
         } else {
             if (timeout === undefined) timeout = 5000;
-            hideMessage(timeout);
+            hideMessage(timeout, messageToken);
         }
+        return messageToken;
     }
 }
 
-function hideMessage(timeout) {
+function hideMessage(timeout, messageToken) {
     $('.waifu-tips').stop().css('opacity',1);
     if (timeout === undefined) timeout = 5000;
-    window.setTimeout(function() {sessionStorage.removeItem('waifu-text')}, timeout);
-    $('.waifu-tips').delay(timeout).fadeTo(200, 0);
+    if (currentHideTimer) {
+        window.clearTimeout(currentHideTimer);
+        currentHideTimer = null;
+    }
+    currentHideTimer = window.setTimeout(function() {
+        if (messageToken !== undefined && messageToken !== currentMessageToken) return;
+        sessionStorage.removeItem('waifu-text');
+        $('.waifu-tips').stop().fadeTo(200, 0);
+        currentHideTimer = null;
+    }, timeout);
+}
+
+function keepMessageVisibleUntilTTS(messageToken, fallbackTimeout) {
+    if (messageToken === undefined) return;
+    if (!live2d_settings.ttsEnabled || !live2d_settings.ttsService) {
+        hideMessage(fallbackTimeout || 5000, messageToken);
+        return;
+    }
+
+    currentTTSDonePromise.finally(function() {
+        hideMessage(300, messageToken);
+    });
 }
 
 function initModel(waifuPath, type) {
@@ -628,6 +1464,126 @@ function initModel(waifuPath, type) {
         return m || live2d_settings.modelNormal || live2d_settings.modelThinking;
     }
 
+    async function fetchLLMReplyStandard(messages, modelToUse, signal) {
+        const response = await fetch(live2d_settings.llmApiUrl, {
+            method: 'POST',
+            signal: signal,
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + live2d_settings.llmApiKey },
+            body: JSON.stringify({
+                model: modelToUse,
+                messages: messages,
+                temperature: 0.7,
+                stream: false
+            })
+        });
+
+        if (!response.ok) throw new Error('API Error: ' + response.status);
+        const data = await response.json();
+        if (data.choices && data.choices.length > 0) {
+            return data.choices[0].message.content || '';
+        }
+        return '';
+    }
+
+    async function fetchLLMReplySentenceStream(messages, modelToUse, signal) {
+        const response = await fetch(live2d_settings.llmApiUrl, {
+            method: 'POST',
+            signal: signal,
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + live2d_settings.llmApiKey },
+            body: JSON.stringify({
+                model: modelToUse,
+                messages: messages,
+                temperature: 0.7,
+                stream: true
+            })
+        });
+
+        if (!response.ok) throw new Error('API Error: ' + response.status);
+        if (!response.body) throw new Error('当前接口不支持流式返回');
+
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder('utf-8');
+        var pending = '';
+        var fullText = '';
+        var sentenceBuffer = '';
+        var pipeline = createSentenceTTSPipeline();
+
+        function handleEventBlock(blockText) {
+            var lines = blockText.split(/\r?\n/);
+            lines.forEach(function(line) {
+                if (!line || line.indexOf('data:') !== 0) return;
+
+                var raw = line.slice(5).trim();
+                if (!raw) return;
+                if (raw === '[DONE]') return;
+
+                try {
+                    var payload = JSON.parse(raw);
+                    var delta = '';
+                    if (payload.choices && payload.choices[0]) {
+                        delta = (payload.choices[0].delta && payload.choices[0].delta.content) ||
+                                (payload.choices[0].message && payload.choices[0].message.content) ||
+                                '';
+                    } else if (payload.message && payload.message.content) {
+                        delta = payload.message.content;
+                    } else if (payload.response) {
+                        delta = payload.response;
+                    }
+
+                    if (!delta) return;
+
+                    fullText += delta;
+                    sentenceBuffer += delta;
+
+                    live2d_settings.isLLMWriting = true;
+                    showMessage(fullText, 0, true);
+                    live2d_settings.isLLMWriting = false;
+
+                    while (true) {
+                        var splitResult = extractSpeakableSentence(sentenceBuffer);
+                        if (!splitResult) break;
+                        if (splitResult.sentence) pipeline.enqueue(splitResult.sentence);
+                        sentenceBuffer = splitResult.rest;
+                    }
+                } catch (e) {
+                    console.warn('[LLM Stream] 无法解析数据块:', raw);
+                }
+            });
+        }
+
+        try {
+            while (true) {
+                const result = await reader.read();
+                if (result.done) break;
+
+                pending += decoder.decode(result.value, { stream: true });
+                var blocks = pending.split('\n\n');
+                pending = blocks.pop();
+
+                blocks.forEach(handleEventBlock);
+            }
+
+            pending += decoder.decode();
+            if (pending.trim()) handleEventBlock(pending);
+
+            if (sentenceBuffer.trim()) {
+                pipeline.enqueue(sentenceBuffer.trim());
+            }
+            pipeline.finish();
+            var pipelineDonePromise = pipeline.waitUntilDone();
+            trackCurrentTTSPromise(pipelineDonePromise);
+            pipelineDonePromise.catch(function(error) {
+                console.error('[TTS Pipeline] 后台播放失败:', error);
+            });
+            return fullText;
+        } catch (error) {
+            pipeline.abort();
+            throw error;
+        } finally {
+            try { reader.cancel(); } catch (e) {}
+        }
+    }
+
     // Chat 逻辑
     $('.waifu-tool .fui-star').click(function() {
         var chatBox = $('.waifu-chat-box');
@@ -736,27 +1692,25 @@ function initModel(waifuPath, type) {
         try {
             llmAbortController = new AbortController(); 
 
-            const response = await fetch(live2d_settings.llmApiUrl, {
-                method: 'POST',
-                signal: llmAbortController.signal,
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + live2d_settings.llmApiKey },
-                body: JSON.stringify({
-                    model: modelToUse,
-                    messages: messages,
-                    temperature: 0.7,
-                    stream: false
-                })
-            });
+            var reply = '';
+            var ttsPlaybackPromise = Promise.resolve();
+            if (live2d_settings.ttsEnabled && live2d_settings.ttsPipelineMode === 'sentence_stream') {
+                reply = await fetchLLMReplySentenceStream(messages, modelToUse, llmAbortController.signal);
+                ttsPlaybackPromise = currentTTSDonePromise;
+            } else {
+                reply = await fetchLLMReplyStandard(messages, modelToUse, llmAbortController.signal);
+                if (reply) {
+                    ttsPlaybackPromise = speakMessageWithTTS(reply);
+                }
+            }
 
-            if (!response.ok) throw new Error('API Error: ' + response.status);
-            const data = await response.json();
-
-            if (data.choices && data.choices.length > 0) {
-                let reply = data.choices[0].message.content;
-
+            if (reply) {
                 live2d_settings.isLLMWriting = true;
-                showMessage(reply, 6000, true);
-
+                var replyMessageToken = showMessage(reply, live2d_settings.ttsEnabled ? 0 : 6000, true);
+                if (live2d_settings.ttsEnabled) {
+                    trackCurrentTTSPromise(ttsPlaybackPromise);
+                    keepMessageVisibleUntilTTS(replyMessageToken, 6000);
+                }
                 appendHistoryItem('assistant', reply, null);
                 
                 // --- 保存历史记录 (存 URL) ---
@@ -792,6 +1746,7 @@ function initModel(waifuPath, type) {
                     localStorage.setItem('waifu_chat_history', JSON.stringify(history));
                     console.log("对话历史已保存,共", history.length, "条消息");
                 }
+                live2d_settings.isLLMWriting = false;
             }
         } catch (error) {
             if (error.name === 'AbortError') {
@@ -873,7 +1828,12 @@ function initModel(waifuPath, type) {
             if (live2d_settings.peekMode === 'chat') {
                 showMessage("回复已经复制到剪贴板啦！\n" + data.reply, 5000, true);
             } else {
-                showMessage(data.reply, 6000, true);
+                var roastMessageToken = showMessage(data.reply, live2d_settings.ttsEnabled ? 0 : 6000, true);
+                var roastPlaybackPromise = speakMessageWithTTS(data.reply);
+                if (live2d_settings.ttsEnabled) {
+                    trackCurrentTTSPromise(roastPlaybackPromise);
+                    keepMessageVisibleUntilTTS(roastMessageToken, 6000);
+                }
             }
 
         } catch (error) {

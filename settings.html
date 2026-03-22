@@ -336,12 +336,16 @@
             function toggleLLMUI() {
                 var mode = $('#peek-mode').val();
                 var target = $('#peek-target-type').val();
+                var ttsService = $('#tts-service').val();
                 
                 $('.prompt-group').hide();
                 $('#group-prompt-' + mode).show();
 
                 if (target === 'window') $('#group-window-select').show();
                 else $('#group-window-select').hide();
+
+                if (ttsService === 'gpt_sovits') $('#tts-provider-gpt-sovits').show();
+                else $('#tts-provider-gpt-sovits').hide();
             }
 
             // --- 6. 清除对话数据 ---
