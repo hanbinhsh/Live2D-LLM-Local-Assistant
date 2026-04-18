@@ -51,6 +51,15 @@
                 <option value="switch">顺序切换</option>
             </select>
         </div>
+        <div class="setting-section-title">外部本地模型</div>
+        <div class="setting-group checkbox-group">
+            <label><input data-key="customModelEnabled" class="config-item" type="checkbox"> 启用外部模型加载</label>
+            <label><input data-key="customModelAutoLoad" class="config-item" type="checkbox"> 启动时优先自动加载外部模型</label>
+        </div>
+        <div class="setting-group">
+            <label class="setting-label">外部模型文件夹</label>
+            <input data-key="customModelFolder" class="waifu-select config-item" type="text" placeholder="例如: F:\files\重音テト\VTS Model File\重音テト">
+        </div>
     </div>
     <!-- Tab 2: 样式设置 -->
     <div id="tab-style" class="tab-pane" style="display:none;">

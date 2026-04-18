@@ -7,7 +7,7 @@ import win32con
 import ctypes
 from PIL import Image, ImageGrab
 from fastapi import FastAPI, HTTPException, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import requests
@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from activity_tracker import tracker
 import json
 import time
+from pathlib import Path
 
 app = FastAPI()
 
@@ -56,6 +57,9 @@ from plugin.tts import get_tts_engine
 
 UPLOAD_DIR = os.path.join(PROJECT_ROOT, "storage", "image_upload")
 STORAGE_ROOT = os.path.join(PROJECT_ROOT, "storage")
+CUSTOM_MODEL_DEFAULT_FOLDER = r"F:\files\重音テト\VTS Model File\重音テト"
+CUSTOM_MODEL_ROUTE_PREFIX = "http://127.0.0.1:11542/live2d/custom_model"
+CUSTOM_MODEL_REGISTRY = {}
 
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
@@ -79,6 +83,325 @@ class TTSSpeakRequest(BaseModel):
     text: str = ""
     provider: str = "gpt_sovits"
     settings: dict = Field(default_factory=dict)
+
+
+class CustomModelRegisterRequest(BaseModel):
+    folder_path: str = CUSTOM_MODEL_DEFAULT_FOLDER
+
+
+def _to_posix_path(path_like):
+    return str(path_like).replace("\\", "/")
+
+
+def _ensure_json_dict(value, label):
+    if not isinstance(value, dict):
+        raise HTTPException(status_code=400, detail=f"{label} 不是有效的 JSON 对象")
+    return value
+
+
+def _load_json_file(path_obj, label):
+    try:
+        with open(path_obj, "r", encoding="utf-8") as f:
+            return _ensure_json_dict(json.load(f), label)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"{label} 不存在: {path_obj}")
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"{label} JSON 解析失败: {e}")
+
+
+def _resolve_child_path(root_path, relative_path):
+    root_real = os.path.realpath(str(root_path))
+    candidate = os.path.realpath(os.path.join(root_real, relative_path))
+    try:
+        if os.path.commonpath([root_real, candidate]) != root_real:
+            raise HTTPException(status_code=403, detail="非法路径访问")
+    except ValueError:
+        raise HTTPException(status_code=403, detail="非法路径访问")
+    return candidate
+
+
+def _strip_known_suffix(file_name, suffix):
+    lower_name = file_name.lower()
+    lower_suffix = suffix.lower()
+    if lower_name.endswith(lower_suffix):
+        return file_name[: -len(suffix)]
+    return os.path.splitext(file_name)[0]
+
+
+def _normalize_motion_group(file_name):
+    base_name = _strip_known_suffix(file_name, ".motion3.json")
+    lowered = base_name.lower()
+    if "idle" in lowered:
+        return "Idle"
+    if "sleep" in lowered:
+        return "Sleep"
+    if "tap" in lowered:
+        return "Tap"
+    if "touch" in lowered:
+        return "Touch"
+    if "flick" in lowered:
+        return "Flick"
+    return base_name
+
+
+def _scan_cubism4_assets(root_path, manifest_data):
+    file_refs = manifest_data.setdefault("FileReferences", {})
+
+    expressions = []
+    raw_expressions = file_refs.get("Expressions") or []
+    if isinstance(raw_expressions, list) and raw_expressions:
+        for item in raw_expressions:
+            if isinstance(item, dict) and item.get("File"):
+                name = item.get("Name") or _strip_known_suffix(os.path.basename(item["File"]), ".exp3.json")
+                expressions.append({"name": name, "file": _to_posix_path(item["File"])})
+    else:
+        expression_dir = root_path / "Expressions"
+        if expression_dir.exists():
+            for exp_file in sorted(expression_dir.glob("*.exp3.json")):
+                expressions.append({
+                    "name": _strip_known_suffix(exp_file.name, ".exp3.json"),
+                    "file": _to_posix_path(exp_file.relative_to(root_path)),
+                })
+        if expressions:
+            file_refs["Expressions"] = [{"Name": item["name"], "File": item["file"]} for item in expressions]
+
+    motions = {}
+    raw_motions = file_refs.get("Motions") or {}
+    if isinstance(raw_motions, dict) and raw_motions:
+        for group_name, group_items in raw_motions.items():
+            if not isinstance(group_items, list):
+                continue
+            normalized_items = []
+            for item in group_items:
+                if isinstance(item, dict) and item.get("File"):
+                    normalized_items.append({"file": _to_posix_path(item["File"])})
+            if normalized_items:
+                motions[group_name] = normalized_items
+    else:
+        motion_dir = root_path / "Motions"
+        motion_files = []
+        if motion_dir.exists():
+            motion_files.extend(sorted(motion_dir.glob("*.motion3.json")))
+        motion_files.extend(sorted(root_path.glob("*.motion3.json")))
+        seen_files = set()
+        for motion_file in motion_files:
+            motion_real = os.path.realpath(str(motion_file))
+            if motion_real in seen_files:
+                continue
+            seen_files.add(motion_real)
+            group_name = _normalize_motion_group(motion_file.name)
+            motions.setdefault(group_name, []).append({
+                "file": _to_posix_path(motion_file.relative_to(root_path))
+            })
+        if motions:
+            file_refs["Motions"] = {
+                group_name: [{"File": item["file"]} for item in items]
+                for group_name, items in motions.items()
+            }
+
+    hit_areas = manifest_data.get("HitAreas") or []
+    if not isinstance(hit_areas, list):
+        hit_areas = []
+
+    return {
+        "motions": motions,
+        "expressions": expressions,
+        "hit_areas": hit_areas,
+    }
+
+
+def _scan_cubism2_assets(root_path, manifest_data):
+    motions = {}
+    raw_motions = manifest_data.get("motions") or {}
+    if isinstance(raw_motions, dict):
+        for group_name, group_items in raw_motions.items():
+            if not isinstance(group_items, list):
+                continue
+            normalized_items = []
+            for item in group_items:
+                if isinstance(item, dict) and item.get("file"):
+                    normalized_items.append({"file": _to_posix_path(item["file"])})
+            if normalized_items:
+                motions[group_name] = normalized_items
+
+    expressions = []
+    raw_expressions = manifest_data.get("expressions") or []
+    if isinstance(raw_expressions, list):
+        for item in raw_expressions:
+            if isinstance(item, dict) and item.get("file"):
+                name = item.get("name") or _strip_known_suffix(os.path.basename(item["file"]), ".json")
+                expressions.append({"name": name, "file": _to_posix_path(item["file"])})
+
+    hit_areas = manifest_data.get("hit_areas") or []
+    if not isinstance(hit_areas, list):
+        hit_areas = []
+
+    return {
+        "motions": motions,
+        "expressions": expressions,
+        "hit_areas": hit_areas,
+    }
+
+
+def _build_cubism2_manifest_from_moc(root_path, moc_file):
+    textures = []
+    for texture_dir_name in ["textures", "textures.1024", "textures.2048", "textures.4096"]:
+        texture_dir = root_path / texture_dir_name
+        if texture_dir.exists():
+            textures.extend(sorted(texture_dir.glob("*.png")))
+    if not textures:
+        textures.extend(sorted(root_path.glob("*.png")))
+    if not textures:
+        raise HTTPException(status_code=400, detail="未找到 Cubism2 贴图资源")
+
+    motions = {}
+    motion_dir = root_path / "motions"
+    if motion_dir.exists():
+        for motion_file in sorted(motion_dir.glob("*.mtn")):
+            group_name = "idle" if "idle" in motion_file.stem.lower() else "default"
+            motions.setdefault(group_name, []).append({
+                "file": _to_posix_path(motion_file.relative_to(root_path))
+            })
+
+    expressions = []
+    expression_dir = root_path / "expressions"
+    if expression_dir.exists():
+        for exp_file in sorted(expression_dir.glob("*.json")):
+            expressions.append({
+                "name": os.path.splitext(exp_file.name)[0],
+                "file": _to_posix_path(exp_file.relative_to(root_path))
+            })
+
+    manifest = {
+        "type": "Live2D Model Setting",
+        "name": root_path.name,
+        "model": _to_posix_path(moc_file.relative_to(root_path)),
+        "textures": [_to_posix_path(texture.relative_to(root_path)) for texture in textures],
+    }
+    if motions:
+        manifest["motions"] = {
+            group_name: [{"file": item["file"]} for item in items]
+            for group_name, items in motions.items()
+        }
+    if expressions:
+        manifest["expressions"] = [
+            {"name": item["name"], "file": item["file"]}
+            for item in expressions
+        ]
+    physics_file = root_path / "physics.json"
+    pose_file = root_path / "pose.json"
+    if physics_file.exists():
+        manifest["physics"] = _to_posix_path(physics_file.relative_to(root_path))
+    if pose_file.exists():
+        manifest["pose"] = _to_posix_path(pose_file.relative_to(root_path))
+    return manifest
+
+
+def _scan_custom_model_folder(folder_path):
+    root_path = Path(folder_path)
+    model3_files = sorted(root_path.glob("*.model3.json"))
+    if model3_files:
+        manifest_path = model3_files[0]
+        manifest_data = _load_json_file(manifest_path, "Cubism4 模型配置")
+        assets = _scan_cubism4_assets(root_path, manifest_data)
+        return {
+            "type": "cubism4",
+            "manifest_data": manifest_data,
+            "display_name": root_path.name,
+            "descriptor": {
+                "motions": {
+                    group_name: [item["file"] for item in items]
+                    for group_name, items in assets["motions"].items()
+                },
+                "expressions": [item["name"] for item in assets["expressions"]],
+                "hit_areas": assets["hit_areas"],
+                "display_name": root_path.name,
+            }
+        }
+
+    legacy_manifest_path = root_path / "index.json"
+    if legacy_manifest_path.exists():
+        manifest_data = _load_json_file(legacy_manifest_path, "Cubism2 模型配置")
+    else:
+        moc_files = sorted(root_path.glob("*.moc"))
+        if not moc_files:
+            raise HTTPException(status_code=400, detail="目录中未找到 *.model3.json、index.json 或 .moc 文件")
+        manifest_data = _build_cubism2_manifest_from_moc(root_path, moc_files[0])
+
+    assets = _scan_cubism2_assets(root_path, manifest_data)
+    return {
+        "type": "cubism2",
+        "manifest_data": manifest_data,
+        "display_name": root_path.name,
+        "descriptor": {
+            "motions": {
+                group_name: [item["file"] for item in items]
+                for group_name, items in assets["motions"].items()
+            },
+            "expressions": [item["name"] for item in assets["expressions"]],
+            "hit_areas": assets["hit_areas"],
+            "display_name": root_path.name,
+        }
+    }
+
+
+def _absolute_resource_url(token, relative_path):
+    return f"{CUSTOM_MODEL_ROUTE_PREFIX}/{token}/{_to_posix_path(relative_path)}"
+
+
+def _rewrite_cubism4_manifest_urls(manifest_data, token):
+    rewritten = json.loads(json.dumps(manifest_data))
+    file_refs = rewritten.setdefault("FileReferences", {})
+
+    if file_refs.get("Moc"):
+        file_refs["Moc"] = _absolute_resource_url(token, file_refs["Moc"])
+    if isinstance(file_refs.get("Textures"), list):
+        file_refs["Textures"] = [_absolute_resource_url(token, item) for item in file_refs["Textures"]]
+    for key in ["Physics", "Pose", "DisplayInfo", "UserData"]:
+        if file_refs.get(key):
+            file_refs[key] = _absolute_resource_url(token, file_refs[key])
+
+    if isinstance(file_refs.get("Expressions"), list):
+        for item in file_refs["Expressions"]:
+            if isinstance(item, dict) and item.get("File"):
+                item["File"] = _absolute_resource_url(token, item["File"])
+
+    if isinstance(file_refs.get("Motions"), dict):
+        for group_items in file_refs["Motions"].values():
+            if not isinstance(group_items, list):
+                continue
+            for item in group_items:
+                if isinstance(item, dict) and item.get("File"):
+                    item["File"] = _absolute_resource_url(token, item["File"])
+                if isinstance(item, dict) and item.get("Sound"):
+                    item["Sound"] = _absolute_resource_url(token, item["Sound"])
+
+    return rewritten
+
+
+def _rewrite_cubism2_manifest_urls(manifest_data, token):
+    rewritten = json.loads(json.dumps(manifest_data))
+    if rewritten.get("model"):
+        rewritten["model"] = _absolute_resource_url(token, rewritten["model"])
+    if isinstance(rewritten.get("textures"), list):
+        rewritten["textures"] = [_absolute_resource_url(token, item) for item in rewritten["textures"]]
+    for key in ["physics", "pose"]:
+        if rewritten.get(key):
+            rewritten[key] = _absolute_resource_url(token, rewritten[key])
+    if isinstance(rewritten.get("expressions"), list):
+        for item in rewritten["expressions"]:
+            if isinstance(item, dict) and item.get("file"):
+                item["file"] = _absolute_resource_url(token, item["file"])
+    if isinstance(rewritten.get("motions"), dict):
+        for group_items in rewritten["motions"].values():
+            if not isinstance(group_items, list):
+                continue
+            for item in group_items:
+                if isinstance(item, dict) and item.get("file"):
+                    item["file"] = _absolute_resource_url(token, item["file"])
+                if isinstance(item, dict) and item.get("sound"):
+                    item["sound"] = _absolute_resource_url(token, item["sound"])
+    return rewritten
 
 # === 窗口工具函数 ===
 def get_scaling_factor():
@@ -186,6 +509,54 @@ def list_models():
     except Exception as e:
         print(f"获取模型列表失败: {e}")
         return {"models": []}
+
+
+@app.post("/live2d/custom_model/register")
+def register_custom_live2d_model(req: CustomModelRegisterRequest):
+    folder_path = (req.folder_path or "").strip() or CUSTOM_MODEL_DEFAULT_FOLDER
+    if not os.path.isdir(folder_path):
+        raise HTTPException(status_code=404, detail=f"模型目录不存在: {folder_path}")
+
+    scan_result = _scan_custom_model_folder(folder_path)
+    token = uuid.uuid4().hex
+    manifest_data = scan_result["manifest_data"]
+    model_type = scan_result["type"]
+
+    if model_type == "cubism4":
+        manifest_data = _rewrite_cubism4_manifest_urls(manifest_data, token)
+    else:
+        manifest_data = _rewrite_cubism2_manifest_urls(manifest_data, token)
+
+    CUSTOM_MODEL_REGISTRY[token] = {
+        "root_path": os.path.realpath(folder_path),
+        "type": model_type,
+        "manifest_data": manifest_data,
+        "descriptor": scan_result["descriptor"],
+        "display_name": scan_result["display_name"],
+    }
+
+    return {
+        "type": model_type,
+        "token": token,
+        "manifest_url": f"{CUSTOM_MODEL_ROUTE_PREFIX}/{token}/__manifest__.json",
+        "descriptor": scan_result["descriptor"],
+    }
+
+
+@app.get("/live2d/custom_model/{token}/{resource_path:path}")
+def get_custom_live2d_resource(token: str, resource_path: str):
+    registry_item = CUSTOM_MODEL_REGISTRY.get(token)
+    if not registry_item:
+        raise HTTPException(status_code=404, detail="自定义模型会话不存在或已失效")
+
+    if resource_path == "__manifest__.json":
+        return JSONResponse(content=registry_item["manifest_data"])
+
+    root_path = registry_item["root_path"]
+    target_path = _resolve_child_path(root_path, resource_path)
+    if not os.path.isfile(target_path):
+        raise HTTPException(status_code=404, detail=f"资源不存在: {resource_path}")
+    return FileResponse(target_path)
 
 
 @app.post("/tts/speak")

@@ -33,6 +33,9 @@ window.WAIFU_GLOBAL_DEFAULTS = {
     modelStorage:           true,       // 记录 ID (刷新后恢复)，可选 true(真), false(假)
     modelRandMode:          'switch',   // 模型切换，可选 'rand'(随机), 'switch'(顺序)
     modelTexturesRandMode:  'rand',     // 材质切换，可选 'rand'(随机), 'switch'(顺序)
+    customModelEnabled:     false,      // 是否启用外部本地模型
+    customModelAutoLoad:    true,       // 启用后优先自动加载外部模型
+    customModelFolder:      'F:\\files\\重音テト\\VTS Model File\\重音テト', // 外部模型目录
 
     // --- 提示消息选项 ---
     showHitokoto:       true,           // 显示一言

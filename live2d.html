@@ -15,6 +15,7 @@
     <div class="waifu">
         <div class="waifu-tips"></div>
         <canvas id="live2d" class="live2d"></canvas>
+        <canvas id="live2d-cubism4" class="live2d" style="display:none;"></canvas>
         <div class="waifu-tool">
             <span class="fui-pause"></span>
             <span class="fui-home"></span>
@@ -66,7 +67,11 @@
     </div>
     
     <script src="assets/waifu-config.js"></script>
-    <script src="assets/waifu-tips.js?v=1.4.2"></script>
+    <script src="assets/vendor/pixi.min.js"></script>
+    <script src="assets/vendor/live2dcubismcore.min.js"></script>
+    <script src="assets/vendor/pixi-live2d-cubism4.min.js"></script>
+    <script src="assets/live2d-cubism4.js?v=1.0.0"></script>
+    <script src="assets/waifu-tips.js?v=1.4.3"></script>
     <script src="assets/live2d.js?v=1.0.5"></script>
     <script type="text/javascript">
         // 定义加载函数

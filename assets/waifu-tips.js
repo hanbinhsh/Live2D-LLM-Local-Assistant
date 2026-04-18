@@ -898,16 +898,20 @@ function localAPI(action, modelID, texturesID=0){
         while(newModelID === modelID && newModelID !== 0){
             newModelID = Math.floor(Math.random()*(staticAPI.model_list.models.length));
         }
-        loadModel(newModelID, 0);
+        loadModel(newModelID, 0, { forceBuiltin: true });
         showMessage(staticAPI.model_list.messages[newModelID], 3000, true);
     } else if (action === 'switchModel'){
         let newModelID = modelID+1;
         if(newModelID >= staticAPI.model_list.models.length){
             newModelID = 0;
         }
-        loadModel(newModelID, 0);
+        loadModel(newModelID, 0, { forceBuiltin: true });
         showMessage(staticAPI.model_list.messages[newModelID], 3000, true);
     } else if (action === 'randTextures' || action === 'switchTextures'){
+        if (window.__waifuCurrentModelSource === 'custom') {
+            showMessage("当前模型还没有可切换皮肤哦", 3000, true);
+            return;
+        }
         
         // 1. 获取当前模型总共有多少个皮肤
         let totalTexturesNum;
@@ -953,8 +957,85 @@ function localAPI(action, modelID, texturesID=0){
         showMessage(successText, 3000, true);
 
         // 5. 加载新皮肤
-        loadModel(modelID, newTextureID);
+        loadModel(modelID, newTextureID, { forceBuiltin: true });
     }
+}
+
+window.__waifuCurrentModelSource = 'builtin';
+
+function shouldPreferCustomModel(options) {
+    options = options || {};
+    if (options.forceBuiltin) return false;
+    return !!(
+        live2d_settings.customModelEnabled &&
+        live2d_settings.customModelAutoLoad &&
+        typeof live2d_settings.customModelFolder === 'string' &&
+        live2d_settings.customModelFolder.trim()
+    );
+}
+
+async function registerCustomModelFolder(folderPath) {
+    var response = await fetch(getPythonServerBaseUrl() + 'live2d/custom_model/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder_path: folderPath })
+    });
+
+    var result = null;
+    try {
+        result = await response.json();
+    } catch (e) {}
+
+    if (!response.ok) {
+        throw new Error(result && (result.detail || result.error) ? (result.detail || result.error) : '自定义模型注册失败');
+    }
+    return result;
+}
+
+function activateLegacyBridge() {
+    if (window.Live2DModelBridge && typeof window.Live2DModelBridge.useLegacy === 'function' && typeof window.Live2DManager !== 'undefined') {
+        window.Live2DModelBridge.useLegacy(window.Live2DManager);
+        if (window.Live2DCubism4 && typeof window.Live2DCubism4.exportDebugInfo === 'function') {
+            setTimeout(function() {
+                window.Live2DCubism4.exportDebugInfo();
+            }, 500);
+        }
+    }
+}
+
+function loadBuiltinModel(modelId, modelTexturesId) {
+    window.__waifuCurrentModelSource = 'builtin';
+    if (window.Live2DCubism4 && typeof window.Live2DCubism4.destroy === 'function') {
+        window.Live2DCubism4.destroy();
+    }
+    loadlive2d('live2d', localAPI('get', modelId, modelTexturesId), 
+        (live2d_settings.showF12Status ? console.log('[Status]','live2d','模型',modelId+'-'+modelTexturesId,'加载完成'):null));
+    setTimeout(activateLegacyBridge, 500);
+}
+
+async function loadExternalCustomModel(folderPath) {
+    var registration = await registerCustomModelFolder(folderPath);
+    if (!registration || !registration.manifest_url) {
+        throw new Error('自定义模型返回了空配置');
+    }
+
+    if (registration.type === 'cubism4') {
+        if (!window.Live2DCubism4 || typeof window.Live2DCubism4.load !== 'function') {
+            throw new Error('Cubism4 前端运行时未准备好');
+        }
+        await window.Live2DCubism4.load(registration.manifest_url, registration.descriptor || {});
+        window.__waifuCurrentModelSource = 'custom';
+        return registration;
+    }
+
+    if (window.Live2DCubism4 && typeof window.Live2DCubism4.destroy === 'function') {
+        window.Live2DCubism4.destroy();
+    }
+    loadlive2d('live2d', registration.manifest_url, 
+        (live2d_settings.showF12Status ? console.log('[Status]','live2d','自定义模型加载完成'):null));
+    window.__waifuCurrentModelSource = 'custom';
+    setTimeout(activateLegacyBridge, 500);
+    return registration;
 }
 
 
@@ -1043,6 +1124,13 @@ function keepMessageVisibleUntilTTS(messageToken, fallbackTimeout) {
     });
 }
 
+function expandLive2DSelector(selector) {
+    if (!selector || typeof selector !== 'string') return selector;
+    if (selector.indexOf('#live2d') === -1) return selector;
+    if (selector.indexOf('#live2d-cubism4') !== -1) return selector;
+    return selector.replace(/#live2d/g, '#live2d, #live2d-cubism4');
+}
+
 function initModel(waifuPath, type) {
     // ==========================================
     //       全局设置面板绑定逻辑
@@ -1092,6 +1180,10 @@ function initModel(waifuPath, type) {
 
             // 保存所有 config-item 到 LocalStorage
             saveGlobalSettings();
+
+            if (key === 'customModelEnabled' || key === 'customModelAutoLoad' || key === 'customModelFolder') {
+                loadModel(live2d_settings.nowModelID || live2d_settings.modelId || 0, live2d_settings.nowTexturesID || live2d_settings.modelTexturesId || 0);
+            }
         });
 
         $('.waifu-tool .fui-gear').click(function() { $('.waifu-settings-panel').addClass('open'); });
@@ -1862,63 +1954,34 @@ function initModel(waifuPath, type) {
         console.log("[Bridge] 初始化调试桥接...");
 
         var exportTimer = setInterval(function() {
-            // 1. 环境检查
-            if (typeof window.Live2DManager === 'undefined' || !window.Live2DManager.getModel(0)) {
+            if (!window.Live2DModelBridge || !window.Live2DModelBridge.getModel(0)) {
                 return;
             }
-            
-            var model = window.Live2DManager.getModel(0);
-            if (!model.modelSetting || !model.modelSetting.json) return;
 
-            // 2. 深度提取数据
             try {
-                // --- A. 提取表情 (Expressions) ---
-                var expressions = model.expressions ? Object.keys(model.expressions) : [];
-
-                // --- B. 提取动作详细列表 (Motions) ---
-                // 目标结构: { "idle": ["Breath1.mtn", "Breath2.mtn"], "tap_body": [...] }
-                var motionDetail = {};
-                var rawMotions = model.modelSetting.json.motions; 
-                
-                if (rawMotions) {
-                    for (var group in rawMotions) {
-                        var fileList = rawMotions[group];
-                        // 仅提取文件名，方便展示
-                        motionDetail[group] = fileList.map(function(item) {
-                            // item.file 可能是 "motions/Breath1.mtn"
-                            return item.file;
-                        });
-                    }
+                if (window.Live2DCubism4 && typeof window.Live2DCubism4.exportDebugInfo === 'function') {
+                    window.Live2DCubism4.exportDebugInfo();
                 }
-
-                // 3. 写入 LocalStorage
-                var debugInfo = {
-                    expressions: expressions,
-                    motions: motionDetail, // 注意：这里现在是一个对象，不是数组了
-                    modelId: live2d_settings.modelId || 0,
-                    timestamp: new Date().getTime()
-                };
-                
-                localStorage.setItem('waifu_debug_info', JSON.stringify(debugInfo));
-                
                 clearInterval(exportTimer);
-                setInterval(checkModelChange, 2000, model);
+                setInterval(checkModelChange, 2000);
                 
             } catch (e) {
                 console.error("[Bridge] 数据提取失败:", e);
             }
         }, 1000);
 
-        // 辅助：检测模型是否切换
         var currentModelRef = null;
-        function checkModelChange(model) {
-            if (window.Live2DManager.getModel(0) !== currentModelRef) {
-                currentModelRef = window.Live2DManager.getModel(0);
-                // location.reload(); // 简单处理：模型变了刷新页面重新加载逻辑
+        function checkModelChange() {
+            if (!window.Live2DModelBridge) return;
+            var model = window.Live2DModelBridge.getModel(0);
+            if (model !== currentModelRef) {
+                currentModelRef = model;
+                if (window.Live2DCubism4 && typeof window.Live2DCubism4.exportDebugInfo === 'function') {
+                    window.Live2DCubism4.exportDebugInfo();
+                }
             }
         }
 
-        // 4. 监听指令 (跨窗口)
         window.addEventListener('storage', function(e) {
             if (e.key === 'waifu_debug_command' && e.newValue) {
                 var cmd = JSON.parse(e.newValue);
@@ -1929,64 +1992,16 @@ function initModel(waifuPath, type) {
 
     // --- 通用执行函数 (核心修改：支持指定 Index) ---
     window.executeDebugCommand = function(cmd) {
-        var model = window.Live2DManager.getModel(0);
-        if (!model) return;
-
+        if (!window.Live2DModelBridge || typeof window.Live2DModelBridge.executeDebugCommand !== 'function') {
+            return;
+        }
         console.log("[Bridge] 执行指令:", cmd.type);
-
-        if (cmd.type === 'expression') {
-            model.setExpression(cmd.name);
-            showMessage("调试表情: " + cmd.name, 1000, true);
-        } 
-        else if (cmd.type === 'motion') {
-            if (cmd.index !== undefined) {
-                model.startMotion(cmd.name, cmd.index, 3);
-                showMessage("调试动作: " + cmd.filename, 1000, true);
-            } else {
-                model.startRandomMotion(cmd.name, 3);
-            }
-        }
-        // ==========================================
-        // 处理 Raw Motion 数据
-        // ==========================================
-        else if (cmd.type === 'raw_motion') {
-            try {
-                var rawData = cmd.data;
-                
-                // 1. 字符串转 ArrayBuffer
-                // .mtn 文件通常是 ASCII/UTF-8 文本，直接按字节转换即可
-                var buf = new ArrayBuffer(rawData.length);
-                var bufView = new Uint8Array(buf);
-                for (var i = 0, strLen = rawData.length; i < strLen; i++) {
-                    bufView[i] = rawData.charCodeAt(i);
-                }
-
-                // 2. 调用 Live2D 内部的加载器
-                // Live2DMotion 是 live2d.js 暴露的全局类
-                var motion = Live2DMotion.loadMotion(buf);
-                
-                // 3. 设置淡入淡出 (可选，防止闪烁)
-                // 你也可以解析 rawData 里的 $fadein=... 手动设置，但 loadMotion 通常会自动解析
-                // motion.setFadeIn(100);
-                // motion.setFadeOut(100);
-
-                // 4. 强制播放
-                // 优先级 3 (PRIORITY_NORMAL) 或 4 (PRIORITY_FORCE)
-                // model.mainMotionManager 是动作管理器
-                model.mainMotionManager.startMotionPrio(motion, 3);
-                
-                showMessage("正在执行自定义动作...", 1000, true);
-                console.log("[Bridge] Raw Motion 播放成功");
-
-            } catch (e) {
-                console.error("[Bridge] Raw Motion 执行失败:", e);
-                alert("动作数据解析失败，请检查格式。\n" + e.message);
-            }
-        }
+        window.Live2DModelBridge.executeDebugCommand(cmd);
     };
 }
 
-function loadModel(modelId, modelTexturesId=0) {
+async function loadModel(modelId, modelTexturesId=0, options) {
+    options = options || {};
     modelId = parseInt(modelId);
     modelTexturesId = parseInt(modelTexturesId);
     console.log('[Debug] loadModel called with modelId:', modelId, 'texturesId:', modelTexturesId);
@@ -1998,23 +2013,35 @@ function loadModel(modelId, modelTexturesId=0) {
         sessionStorage.setItem('modelId', modelId);
         sessionStorage.setItem('modelTexturesId', modelTexturesId);
     }
-    
-    loadlive2d('live2d', localAPI('get', modelId, modelTexturesId), 
-        (live2d_settings.showF12Status ? console.log('[Status]','live2d','模型',modelId+'-'+modelTexturesId,'加载完成'):null));
+
+    if (shouldPreferCustomModel(options)) {
+        try {
+            var registration = await loadExternalCustomModel(live2d_settings.customModelFolder.trim());
+            if (registration && registration.descriptor && registration.descriptor.display_name) {
+                showMessage("已加载外部模型: " + registration.descriptor.display_name, 2500, true);
+            }
+            return;
+        } catch (error) {
+            console.error('[CustomModel] load failed:', error);
+            showMessage("外部模型加载失败，先切回内置模型啦", 3000, true);
+        }
+    }
+
+    loadBuiltinModel(modelId, modelTexturesId);
 }
 
 function loadTipsMessage(result) {
     window.waifu_tips = result;
     
     $.each(result.mouseover, function (index, tips){
-        $(document).on("mouseover", tips.selector, function (){
+        $(document).on("mouseover", expandLive2DSelector(tips.selector), function (){
             var text = getRandText(tips.text);
             text = text.render({text: $(this).text()});
             showMessage(text, 3000);
         });
     });
     $.each(result.click, function (index, tips){
-        $(document).on("click", tips.selector, function (){
+        $(document).on("click", expandLive2DSelector(tips.selector), function (){
             var text = getRandText(tips.text);
             text = text.render({text: $(this).text()});
             showMessage(text, 3000, true);
@@ -2050,6 +2077,19 @@ function loadTipsMessage(result) {
     
     $('.waifu-tool .fui-photo').click(function(){
         showMessage(getRandText(result.waifu.screenshot_message), 5000, true);
+        if (window.__waifuCurrentModelSource === 'custom') {
+            var customCanvas = document.getElementById('live2d-cubism4');
+            if (customCanvas) {
+                var link = document.createElement('a');
+                link.setAttribute('type', 'hidden');
+                link.href = customCanvas.toDataURL('image/png');
+                link.download = live2d_settings.screenshotCaptureName || 'live2d.png';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                return;
+            }
+        }
         window.Live2D.captureName = live2d_settings.screenshotCaptureName;
         window.Live2D.captureFrame = true;
     });
