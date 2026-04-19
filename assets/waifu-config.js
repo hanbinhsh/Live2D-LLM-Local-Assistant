@@ -115,6 +115,9 @@ window.WAIFU_GLOBAL_DEFAULTS = {
     useThinkingWaifu:   false,          // 闲聊是否使用思考模型
     useThinkingChat:    true,           // 聊天助手是否使用思考模型
     useThinkingRoast:   false,          // 吐槽是否使用思考模型
+    modelWaifu:         '',             // 看板娘对话模型
+    modelChat:          '',             // 聊天助手模型
+    modelRoast:         '',             // 屏幕吐槽模型
     waifuPrompt: '你是一个网页看板娘，请用简短、可爱的语气回答，不要超过50个字。',
     
     // Peek 设置
@@ -207,6 +210,23 @@ try {
     // 使用 $.extend(true, ...) 如果需要深拷贝，或者简单的一层合并
     // 这里使用 Object.assign 或 $.extend 均可
     window.live2d_settings = $.extend({}, default_settings, savedObj);
+
+    // 兼容旧版“普通/思考模型 + 开关”配置，平滑迁移到独立模型选择
+    if (!window.live2d_settings.modelWaifu) {
+        window.live2d_settings.modelWaifu = window.live2d_settings.useThinkingWaifu
+            ? (window.live2d_settings.modelThinking || window.live2d_settings.modelNormal)
+            : (window.live2d_settings.modelNormal || window.live2d_settings.modelThinking);
+    }
+    if (!window.live2d_settings.modelChat) {
+        window.live2d_settings.modelChat = window.live2d_settings.useThinkingChat
+            ? (window.live2d_settings.modelThinking || window.live2d_settings.modelNormal)
+            : (window.live2d_settings.modelNormal || window.live2d_settings.modelThinking);
+    }
+    if (!window.live2d_settings.modelRoast) {
+        window.live2d_settings.modelRoast = window.live2d_settings.useThinkingRoast
+            ? (window.live2d_settings.modelThinking || window.live2d_settings.modelNormal)
+            : (window.live2d_settings.modelNormal || window.live2d_settings.modelThinking);
+    }
     
     console.log('[Status] Configuration loaded.');
 } catch (e) { 
@@ -234,6 +254,27 @@ window.WaifuShared = {
     fetchModelList: async function(btn) {
         let live2d_settings = window.live2d_settings
         if(btn) btn.text('刷新中...');
+
+        function fillSelect(selector, currentValue, offlineLabel) {
+            var $select = $(selector);
+            if (!$select.length) return;
+
+            if (offlineLabel) {
+                if (currentValue) {
+                    $select.html(`<option value="${currentValue}">${currentValue} ${offlineLabel}</option>`);
+                    $select.val(currentValue);
+                }
+                return;
+            }
+
+            if (currentValue && $select.find('option[value="' + currentValue + '"]').length === 0) {
+                $select.append(`<option value="${currentValue}">${currentValue}</option>`);
+            }
+            if (currentValue) {
+                $select.val(currentValue);
+            }
+        }
+
         try {
             var url = live2d_settings.pythonServerUrl + 'list_models';
             const response = await fetch(url);
@@ -245,54 +286,49 @@ window.WaifuShared = {
             } else {
                 optionsHtml = '<option value="">未找到模型</option>';
             }
-            $('#model-normal').html(optionsHtml);
-            $('#model-thinking').html(optionsHtml);
-            $('#model-report').html(optionsHtml);
+            ['#model-waifu', '#model-chat', '#model-roast', '#model-report', '#model-normal', '#model-thinking'].forEach(function(selector) {
+                if ($(selector).length) $(selector).html(optionsHtml);
+            });
 
-            if (live2d_settings.modelNormal){
-                if($('#model-normal option[value="' + live2d_settings.modelNormal + '"]').length === 0)
-                    $('#model-normal').html(`<option value="${live2d_settings.modelNormal}">${live2d_settings.modelNormal}</option>`);
-                $('#model-normal').val(live2d_settings.modelNormal);
+            fillSelect('#model-waifu', live2d_settings.modelWaifu);
+            fillSelect('#model-chat', live2d_settings.modelChat);
+            fillSelect('#model-roast', live2d_settings.modelRoast);
+            fillSelect('#model-report', live2d_settings.modelReport);
+            fillSelect('#model-normal', live2d_settings.modelNormal);
+            fillSelect('#model-thinking', live2d_settings.modelThinking);
+
+            if (!live2d_settings.modelWaifu && data.models.length > 0) {
+                live2d_settings.modelWaifu = data.models[0];
+                $('#model-waifu').val(data.models[0]);
             }
-                
-            if (live2d_settings.modelThinking){
-                if ($('#model-thinking option[value="' + live2d_settings.modelThinking + '"]').length === 0)
-                    $('#model-thinking').html(`<option value="${live2d_settings.modelThinking}">${live2d_settings.modelThinking}</option>`);
-                $('#model-thinking').val(live2d_settings.modelThinking);
+            if (!live2d_settings.modelChat && data.models.length > 0) {
+                live2d_settings.modelChat = data.models[0];
+                $('#model-chat').val(data.models[0]);
             }
-            if (live2d_settings.modelReport){
-                if ($('#model-report option[value="' + live2d_settings.modelReport + '"]').length === 0)
-                    $('#model-report').html(`<option value="${live2d_settings.modelReport}">${live2d_settings.modelReport}</option>`);
-                $('#model-report').val(live2d_settings.modelReport);
+            if (!live2d_settings.modelRoast && data.models.length > 0) {
+                live2d_settings.modelRoast = data.models[0];
+                $('#model-roast').val(data.models[0]);
             }
-            
-            if (!$('#model-normal').val() && data.models.length>0) {
-                $('#model-normal').val(data.models[0]);
-                live2d_settings.modelNormal = data.models[0];
-            }
-            if (!$('#model-thinking').val() && data.models.length>0) {
-                $('#model-thinking').val(data.models[0]);
-                live2d_settings.modelThinking = data.models[0];
-            }
-            if (!$('#model-report').val() && data.models.length>0) {
-                $('#model-report').val(data.models[0]);
+            if (!live2d_settings.modelReport && data.models.length > 0) {
                 live2d_settings.modelReport = data.models[0];
+                $('#model-report').val(data.models[0]);
+            }
+
+            if (!live2d_settings.modelNormal) {
+                live2d_settings.modelNormal = live2d_settings.modelWaifu || live2d_settings.modelChat || live2d_settings.modelRoast || '';
+            }
+            if (!live2d_settings.modelThinking) {
+                live2d_settings.modelThinking = live2d_settings.modelChat || live2d_settings.modelRoast || live2d_settings.modelWaifu || '';
             }
 
         } catch (e) {
             console.error("模型列表获取失败：", e);
-            if (live2d_settings.modelNormal){
-                $('#model-normal').html(`<option value="${live2d_settings.modelNormal}">${live2d_settings.modelNormal} (离线)</option>`);
-                $('#model-normal').val(live2d_settings.modelNormal);
-            }
-            if (live2d_settings.modelThinking){
-                $('#model-thinking').html(`<option value="${live2d_settings.modelThinking}">${live2d_settings.modelThinking} (离线)</option>`);
-                $('#model-thinking').val(live2d_settings.modelThinking);
-            }
-            if (live2d_settings.modelReport){
-                $('#model-report').html(`<option value="${live2d_settings.modelReport}">${live2d_settings.modelReport} (离线)</option>`);
-                $('#model-report').val(live2d_settings.modelReport);
-            }
+            fillSelect('#model-waifu', live2d_settings.modelWaifu, '(离线)');
+            fillSelect('#model-chat', live2d_settings.modelChat, '(离线)');
+            fillSelect('#model-roast', live2d_settings.modelRoast, '(离线)');
+            fillSelect('#model-report', live2d_settings.modelReport, '(离线)');
+            fillSelect('#model-normal', live2d_settings.modelNormal, '(离线)');
+            fillSelect('#model-thinking', live2d_settings.modelThinking, '(离线)');
         }
         if(btn) btn.text('刷新列表');
     },

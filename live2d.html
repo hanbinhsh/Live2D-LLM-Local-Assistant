@@ -58,13 +58,6 @@
                 <div class="history-empty">暂无对话记录</div>
             </div>
         </div>
-        <div class="waifu-settings-panel">
-        <div class="settings-header">
-            <span>看板娘全局设置</span>
-            <span class="settings-close">×</span>
-        </div>
-        <div id="settings-inject-point"></div> 
-    </div>
     
     <script src="assets/waifu-config.js"></script>
     <script src="assets/vendor/pixi.min.js"></script>
@@ -74,25 +67,7 @@
     <script src="assets/waifu-tips.js?v=1.4.3"></script>
     <script src="assets/live2d.js?v=1.0.5"></script>
     <script type="text/javascript">
-        // 定义加载函数
-        function loadSettingsAndInit() {
-            // 使用 fetch 或 jQuery load 加载公共 HTML
-            $("#settings-inject-point").load("settings-content.html", function() {
-                // 加载完成后，再初始化模型，确保 DOM 存在
-                initModel("assets/waifu-tips.json?v=1.4.2");
-                
-                // 绑定 Tab 切换逻辑（如果 waifu-tips.js 里没写通过委托绑定的话，这里需要补充）
-                $('.settings-tab-item').click(function() {
-                    $(this).addClass('active').siblings().removeClass('active');
-                    var tab = $(this).data('tab');
-                    $(this).closest('.settings-content, .waifu-settings-panel').find('.tab-pane').hide();
-                    $('#tab-' + tab).show();
-                });
-            });
-        }
-
-        // 执行加载
-        loadSettingsAndInit();
+        initModel("assets/waifu-tips.json?v=1.4.2");
     </script>
 </body>
 </html>

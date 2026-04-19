@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>看板娘控制台 - 设置中心</title>
+    <script src="assets/jquery.min.js?v=3.3.1"></script>
+    <script src="assets/waifu-config.js"></script>
+    <!-- 复用部分原有样式 -->
+    <link rel="stylesheet" type="text/css" href="assets/waifu.css?v=1.4.2"/>
+    
+    <style>
+        /* --- 基础重置与布局优化 --- */
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: #f5f7fa;
+            font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #444;
+        }
+
+        .waifu-settings-wrapper {
+            width: 100%;
+            max-width: 850px;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 85vh;
+            border: 1px solid #ebeef5;
+        }
+
+        /* --- 头部与导航 --- */
+        .settings-header {
+            padding: 18px 24px;
+            background: #fff;
+            border-bottom: 1px solid #ebeef5;
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+        }
+        .settings-close { display: none; }
+
+        .settings-tabs {
+            padding: 0 24px;
+            background: #fcfcfc;
+            border-bottom: 1px solid #ebeef5;
+            display: flex;
+            gap: 20px;
+        }
+        .settings-tab-item {
+            padding: 16px 0;
+            font-size: 14px;
+            color: #606266;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        .settings-tab-item:hover { color: #409eff; }
+        .settings-tab-item.active {
+            color: #409eff;
+            border-bottom-color: #409eff;
+        }
+
+        /* --- 内容区域 --- */
+        .settings-content {
+            padding: 24px 30px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .setting-section-title {
+            font-size: 13px;
+            color: #909399;
+            margin: 20px 0 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-left: 3px solid #409eff;
+            padding-left: 8px;
+            line-height: 1;
+        }
+        .setting-section-title:first-child { margin-top: 0; }
+
+        /* --- 表单控件通用样式 --- */
+        .setting-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 4px 0;
+        }
+
+        /* 标签样式优化：支持内部包含按钮 */
+        .setting-group label.setting-label {
+            width: 220px;
+            flex-shrink: 0;
+            margin-bottom: 0;
+            font-size: 14px;
+            color: #606266;
+            display: flex;
+            align-items: center;
+            /* 如果标签内有按钮，让它们两端对齐或保持间距 */
+            gap: 8px; 
+            /* padding-right: 15px; */
+        }
+
+        /* 输入框与下拉框统一 */
+        .waifu-select, 
+        .waifu-textarea, 
+        input[type="text"], 
+        input[type="password"], 
+        input[type="number"] {
+            flex: 1;
+            max-width: 450px;
+            height: 36px;
+            line-height: 36px; /* 确保垂直居中 */
+            padding: 0 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            background-color: #fff;
+            box-shadow: none;
+            outline: none;
+        }
+
+        .waifu-select:focus,
+        input:focus,
+        .waifu-textarea:focus {
+            border-color: #409eff;
+        }
+        
+        /* 针对 textarea 特殊处理 */
+        .waifu-textarea {
+            height: auto;
+            line-height: 1.5;
+            padding: 8px 12px;
+            font-family: inherit;
+        }
+
+        /* --- 按钮样式优化 (用于 Label 内部的刷新按钮等) --- */
+        .waifu-btn.secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 24px;
+            padding: 0 8px !important;
+            font-size: 12px !important;
+            border-radius: 3px;
+            border: 1px solid #dcdfe6;
+            background: #fff;
+            color: #606266 !important;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            line-height: 1;
+            margin: 5px;
+        }
+        .waifu-btn.secondary:hover {
+            color: #409eff;
+            border-color: #c6e2ff;
+            background-color: #ecf5ff;
+        }
+        /* 强制覆盖原来的 float:right，改用 Flex */
+        .setting-label button {
+            float: none !important;
+            margin-left: auto; /* 自动推到右边，前提是父元素是 flex */
+        }
+
+        /* --- Checkbox 组优化 --- */
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* 响应式网格 */
+            gap: 10px;
+            background: #fcfcfc;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #ebeef5;
+            margin-bottom: 20px;
+        }
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            width: auto !important;
+            margin: 0;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        .checkbox-group hr {
+            grid-column: 1 / -1; /* 分割线占满整行 */
+            border-top-color: #e4e7ed;
+            margin: 5px 0;
+        }
+
+        /* --- Prompt 区域特殊处理 --- */
+        .prompt-group {
+            display: block;
+            margin-bottom: 20px;
+        }
+        /* 重写 Prompt 的 Label，使其成为 Flex 容器以对齐右侧按钮 */
+        .prompt-group .setting-label {
+            width: 100% !important;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .prompt-group textarea {
+            width: 100%;
+            max-width: 100%;
+            height: 100px;
+            resize: vertical;
+        }
+
+        .mtn-group {
+            display: block;
+            margin-bottom: 20px;
+        }
+        .mtn-group .setting-label {
+            width: 100% !important;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .mtn-group textarea {
+            width: 100%;
+            max-width: 100%;
+            height: 100px;
+            resize: vertical;
+        }
+
+        /* --- 底部提示 --- */
+        .footer-tip {
+            text-align: center;
+            padding: 12px;
+            background: #fdfdfd;
+            color: #909399;
+            font-size: 12px;
+            border-top: 1px solid #ebeef5;
+        }
+    </style>
+</head>
+<body>
+    <div class="waifu-settings-wrapper">
+        <div class="settings-header">
+            <span>🔧 看板娘设置中心</span>
+        </div>
+        <div id="settings-inject-container" style="height: 95%; display:flex; flex-direction:column">
+            <div style="padding:20px; text-align:center;">正在加载设置面板...</div>
+        </div>
+    </div>
+    <script>
+        $(document).ready(function() {
+
+            $("#settings-inject-container").load("settings-content.html", function(response, status, xhr) {
+                if (status == "error") {
+                    $("#settings-inject-container").html("加载设置文件失败: " + xhr.status + " " + xhr.statusText);
+                    return;
+                }
+                
+                initSettingsLogic();
+            });
+        });
+
+        function initSettingsLogic() {
+            // --- 2. 定义默认配置 (包含 Global 和 LLM 的所有默认值) ---
+            // 确保这些 Key 与 JS 文件中的 default_settings 一致
+            var defaultSettings = JSON.parse(JSON.stringify(window.WAIFU_GLOBAL_DEFAULTS));
+
+            // --- 3. 读取并填充设置 (统一逻辑) ---
+            function loadSettings() {
+                // 只读取 waifu_global_settings
+                var saved = localStorage.getItem('waifu_global_settings');
+                var config = $.extend({}, defaultSettings, saved ? JSON.parse(saved) : {});
+
+                // 遍历所有带有 config-item 类的输入框
+                $('.config-item').each(function() {
+                    var key = $(this).data('key');
+                    var val = config[key];
+                    
+                    if (val !== undefined) {
+                        if ($(this).attr('type') === 'checkbox') {
+                            $(this).prop('checked', val);
+                        } else {
+                            $(this).val(val);
+                        }
+                    }
+                });
+
+                toggleLLMUI(); // 刷新 UI 显示状态 (UI 依赖于填入的值)
+            }
+
+            // --- 4. 保存逻辑 (统一逻辑) ---
+            function saveSettings() {
+                // 读取当前存储 (保留那些不在界面上的设置，如 modelId)
+                var currentConfig = localStorage.getItem('waifu_global_settings') ? JSON.parse(localStorage.getItem('waifu_global_settings')) : {};
+                
+                // 遍历界面上的所有配置项，更新到对象中
+                $('.config-item').each(function() {
+                    var key = $(this).data('key');
+                    if (key) {
+                        if ($(this).attr('type') === 'checkbox') {
+                            currentConfig[key] = $(this).is(':checked');
+                        } else {
+                            currentConfig[key] = $(this).val();
+                        }
+                    }
+                });
+
+                // 保存回 LocalStorage
+                // 注意：这里保存后，主窗口的 'storage' 事件监听器会捕捉到并同步
+                localStorage.setItem('waifu_global_settings', JSON.stringify(currentConfig));
+            }
+
+            // 监听所有输入变化，自动保存
+            $('input, select, textarea').change(function() {
+                toggleLLMUI();
+                saveSettings();
+            });
+
+            // --- 5. UI 辅助逻辑 ---
+            function toggleLLMUI() {
+                var mode = $('#peek-mode').val();
+                var target = $('#peek-target-type').val();
+                var ttsService = $('#tts-service').val();
+                
+                $('.prompt-group').hide();
+                $('#group-prompt-' + mode).show();
+
+                if (target === 'window') $('#group-window-select').show();
+                else $('#group-window-select').hide();
+
+                if (ttsService === 'gpt_sovits') $('#tts-provider-gpt-sovits').show();
+                else $('#tts-provider-gpt-sovits').hide();
+            }
+
+            // --- 6. 清除对话数据 ---
+
+            $('#btn-clear-memory').click(function() {
+                if(confirm('确定要让看板娘忘记之前的所有对话吗？')) {
+                    localStorage.removeItem('waifu_chat_history');
+                }
+            });
+
+            // --- 7. 初始化执行 ---
+            loadSettings(); 
+            
+            // 自动尝试加载模型列表
+            setTimeout(function() {
+                if ($('input[data-key="pythonServerUrl"]').val()) {
+                    window.WaifuShared.fetchModelList();
+                    $('#btn-refresh-windows').click(); 
+                }
+            }, 100);
+        }
+    </script>
+</body>
+</html>

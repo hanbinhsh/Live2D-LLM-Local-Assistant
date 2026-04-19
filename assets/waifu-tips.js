@@ -1136,15 +1136,32 @@ function initModel(waifuPath, type) {
     //       全局设置面板绑定逻辑
     // ==========================================
     $(document).ready(function() {
-        // 初始化设置面板
-        initSettingsPanel();
+        $(document).on('click', '.waifu-tool .fui-gear', function() {
+            openSettingsCenter({ tab: 'general' });
+        });
+
         window.addEventListener('storage', function(e) {
             if (e.key === 'waifu_global_settings') {
                 console.log('检测到设置变更，正在同步...');
                 // 重新读取配置
                 try {
                     var saved = localStorage.getItem('waifu_global_settings');
-                    if (saved) $.extend(live2d_settings, JSON.parse(saved));
+                    if (saved) {
+                        var nextSettings = JSON.parse(saved);
+                        var shouldReloadModel =
+                            nextSettings.customModelEnabled !== live2d_settings.customModelEnabled ||
+                            nextSettings.customModelAutoLoad !== live2d_settings.customModelAutoLoad ||
+                            nextSettings.customModelFolder !== live2d_settings.customModelFolder;
+
+                        $.extend(live2d_settings, nextSettings);
+
+                        if (shouldReloadModel) {
+                            loadModel(
+                                live2d_settings.nowModelID || live2d_settings.modelId || 0,
+                                live2d_settings.nowTexturesID || live2d_settings.modelTexturesId || 0
+                            );
+                        }
+                    }
                     
                     if (typeof applyImmediateChanges === 'function') {
                         for(var k in live2d_settings) {
@@ -1155,54 +1172,6 @@ function initModel(waifuPath, type) {
             }
         });
     });
-
-    function initSettingsPanel() {
-        // 填充 UI (使用 live2d_settings)
-        updateUIFromSettings();
-
-        // 监听修改
-        $('.config-item').change(function() {
-            var $input = $(this);
-            var key = $input.data('key');
-            var val;
-
-            if ($input.attr('type') === 'checkbox') {
-                val = $input.is(':checked');
-            } else {
-                val = $input.val();
-            }
-
-            // 更新全局变量
-            live2d_settings[key] = val;
-
-            // 立即应用部分 UI 变化 (即时反馈)
-            applyImmediateChanges(key, val);
-
-            // 保存所有 config-item 到 LocalStorage
-            saveGlobalSettings();
-
-            if (key === 'customModelEnabled' || key === 'customModelAutoLoad' || key === 'customModelFolder') {
-                loadModel(live2d_settings.nowModelID || live2d_settings.modelId || 0, live2d_settings.nowTexturesID || live2d_settings.modelTexturesId || 0);
-            }
-        });
-
-        $('.waifu-tool .fui-gear').click(function() { $('.waifu-settings-panel').addClass('open'); });
-        $('.settings-close').click(function() { $('.waifu-settings-panel').removeClass('open'); });
-    }
-    
-    // 从 live2d_settings 恢复 UI 状态
-    function updateUIFromSettings() {
-        $('.config-item').each(function() {
-            var key = $(this).data('key');
-            var val = live2d_settings[key];
-            if (key && val !== undefined) {
-                if ((key === 'waifuSize' || key === 'waifuTipsSize') && Array.isArray(val)) val = val[0] + 'x' + val[1];
-                if ($(this).attr('type') === 'checkbox') $(this).prop('checked', val);
-                else $(this).val(val);
-            }
-        });
-        toggleUI();
-    }
 
     function applyImmediateChanges(key, val) {
         toggleUI()
@@ -1234,9 +1203,24 @@ function initModel(waifuPath, type) {
         }
     }
 
+    function buildSettingsCenterUrl(options) {
+        options = options || {};
+        var params = new URLSearchParams();
+        if (options.tab) params.set('tab', options.tab);
+        if (options.action) params.set('action', options.action);
+        var query = params.toString();
+        return 'settings.html' + (query ? '?' + query : '');
+    }
+
+    function openSettingsCenter(options) {
+        var url = buildSettingsCenterUrl(options);
+        var win = window.open(url, '_blank');
+        if (!win) window.location.href = url;
+    }
+
     // 点击报告按钮
     $(document).on('click', '.waifu-tool .fui-calendar-solid', function() {
-        $('#btn-gen-report').click();
+        openSettingsCenter({ tab: 'report', action: 'generate' });
     });
 
     // --- 图片上传逻辑 ---
@@ -1545,15 +1529,48 @@ function initModel(waifuPath, type) {
     }
 
     setTimeout(function() {
-        if (live2d_settings.pythonServerUrl) {
+        if (live2d_settings.pythonServerUrl && ($('#model-normal').length || $('#peek-window-list').length)) {
             window.WaifuShared.fetchModelList();
             $('#btn-refresh-windows').click(); 
         }
     }, 100);
 
-    function getActiveModel(isThinkingMode) {
-        var m = isThinkingMode ? live2d_settings.modelThinking : live2d_settings.modelNormal;
-        return m || live2d_settings.modelNormal || live2d_settings.modelThinking;
+    function getModelForPurpose(purpose) {
+        if (purpose === 'waifu') {
+            return live2d_settings.modelWaifu ||
+                   live2d_settings.modelNormal ||
+                   live2d_settings.modelThinking ||
+                   live2d_settings.modelChat ||
+                   live2d_settings.modelRoast;
+        }
+        if (purpose === 'chat') {
+            return live2d_settings.modelChat ||
+                   live2d_settings.modelWaifu ||
+                   live2d_settings.modelThinking ||
+                   live2d_settings.modelNormal ||
+                   live2d_settings.modelRoast;
+        }
+        if (purpose === 'roast') {
+            return live2d_settings.modelRoast ||
+                   live2d_settings.modelChat ||
+                   live2d_settings.modelThinking ||
+                   live2d_settings.modelNormal ||
+                   live2d_settings.modelWaifu;
+        }
+        if (purpose === 'report') {
+            return live2d_settings.modelReport ||
+                   live2d_settings.modelWaifu ||
+                   live2d_settings.modelChat ||
+                   live2d_settings.modelRoast ||
+                   live2d_settings.modelNormal ||
+                   live2d_settings.modelThinking;
+        }
+        return live2d_settings.modelWaifu ||
+               live2d_settings.modelChat ||
+               live2d_settings.modelRoast ||
+               live2d_settings.modelReport ||
+               live2d_settings.modelNormal ||
+               live2d_settings.modelThinking;
     }
 
     async function fetchLLMReplyStandard(messages, modelToUse, signal) {
@@ -1708,8 +1725,7 @@ function initModel(waifuPath, type) {
         // 显示停止按钮
         $('.waifu-tool .fui-pause').show();
 
-        var useThinking = live2d_settings.useThinkingWaifu;
-        var modelToUse = getActiveModel(useThinking);
+        var modelToUse = getModelForPurpose('waifu');
 
         console.log("Waifu Chat Model:", modelToUse);
         console.log("记忆开关:", live2d_settings.useMemory, "| 记忆轮数:", live2d_settings.memoryLimit);
@@ -1886,8 +1902,7 @@ function initModel(waifuPath, type) {
         // 显示停止按钮
         $('.waifu-tool .fui-pause').show();
 
-        var useThinking = (live2d_settings.peekMode === 'chat' && live2d_settings.useThinkingChat) || (live2d_settings.peekMode === 'roast' && live2d_settings.useThinkingRoast);
-        var modelToUse = getActiveModel(useThinking);
+        var modelToUse = getModelForPurpose(live2d_settings.peekMode === 'chat' ? 'chat' : 'roast');
 
         console.log("Peek Model:", modelToUse, "| Mode:", live2d_settings.peekMode);
 
