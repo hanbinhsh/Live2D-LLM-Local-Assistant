@@ -6,16 +6,12 @@
     <title>看板娘设置中心</title>
     <script src="assets/jquery.min.js?v=3.3.1"></script>
     <script src="assets/waifu-config.js"></script>
-    <link rel="stylesheet" type="text/css" href="assets/settings-center.css?v=1.0.1">
+    <link rel="stylesheet" type="text/css" href="assets/settings-center.css?v=1.0.2">
 </head>
 <body>
     <div class="settings-app">
         <header class="settings-app-header">
-            <div>
-                <p class="settings-app-kicker">Waifu Control Center</p>
-                <h1>看板娘设置中心</h1>
-                <p class="settings-app-subtitle">这里是唯一的设置入口。配置、报告、调试都会在这里统一维护，并通过实时同步影响正在运行的桌宠页面。</p>
-            </div>
+            <h1>看板娘设置中心</h1>
             <div class="settings-app-actions">
                 <span class="settings-sync-pill" id="settings-sync-indicator">
                     <span class="settings-sync-dot"></span>
@@ -95,12 +91,8 @@
             }
 
             function syncConditionalUI() {
-                var mode = $('#peek-mode').val();
                 var target = $('#peek-target-type').val();
                 var ttsService = $('#tts-service').val();
-
-                $('.prompt-group').hide();
-                $('#group-prompt-' + mode).show();
 
                 if (target === 'window') $('#group-window-select').show();
                 else $('#group-window-select').hide();
@@ -109,24 +101,11 @@
                 else $('#tts-provider-gpt-sovits').hide();
             }
 
-            function syncReportPromptField() {
-                var $prompt = $('#report-prompt');
-                if (!$prompt.length) return;
-
-                var selectedType = $('#prompt-type-select').val();
-                if (selectedType === 'steam') {
-                    $prompt.val(window.live2d_settings.steamPrompt || '');
-                } else {
-                    $prompt.val(window.live2d_settings.reportPrompt || '');
-                }
-            }
-
             function syncLiveSettingsFromStorage() {
                 try {
                     $.extend(window.live2d_settings, readStoredConfig());
                     applyConfigToInputs(window.live2d_settings);
                     syncConditionalUI();
-                    syncReportPromptField();
                     setSyncStatus('已同步最新设置');
                 } catch (error) {
                     console.error('[SettingsCenter] 同步失败:', error);
@@ -150,8 +129,13 @@
                 var params = new URLSearchParams(window.location.search);
                 var targetTab = params.get('tab') || 'general';
                 var action = params.get('action') || '';
+                var reportCategory = params.get('reportCategory') || '';
 
                 activateTab(targetTab);
+
+                if (targetTab === 'report' && reportCategory && $('#report-category').length) {
+                    $('#report-category').val(reportCategory).trigger('change');
+                }
 
                 if (targetTab === 'report' && action === 'generate') {
                     window.setTimeout(function() {
@@ -185,14 +169,12 @@
                 var key = $input.data('key');
                 if (!key) {
                     syncConditionalUI();
-                    syncReportPromptField();
                     return;
                 }
 
                 window.live2d_settings[key] = getInputValue($input);
                 saveGlobalSettings();
                 syncConditionalUI();
-                syncReportPromptField();
                 setSyncStatus('已保存并同步');
             });
 

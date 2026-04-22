@@ -39,7 +39,7 @@ class WebSettingsWindow(QMainWindow):
     def __init__(self, profile):
         super().__init__()
         self.setWindowTitle("看板娘配置 (Web)")
-        self.resize(1000, 750)
+        self.resize(1280, 820)
         self.setAttribute(Qt.WA_DeleteOnClose, False)
         self.browser = QWebEngineView(self)
         # 使用自定义的 ReportInterceptorPage

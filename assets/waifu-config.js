@@ -49,6 +49,8 @@ window.WAIFU_GLOBAL_DEFAULTS = {
     waifuSize:              '280x250',  // 看板娘大小，例如 '280x250', '600x535'
     waifuTipsSize:          '250x75',   // 提示框大小，例如 '250x70', '570x150'
     waifuFontSize:          '12px',     // 提示框字体，例如 '12px', '30px'
+    waifuTipsBackgroundColor:'rgba(170, 170, 170, 0.5)', // 提示框背景颜色，例如 '#f4c7b5', 'rgba(170,170,170,0.5)'
+    waifuTipsTextColor:     '#000000',// 提示框字体颜色，例如 '#ffffff', '#2f261f'
     waifuToolFont:          '14px',     // 工具栏字体，例如 '14px', '36px'
     waifuToolLine:          '20px',     // 工具栏行高，例如 '20px', '36px'
     waifuToolTop:           '-20px',    // 工具栏顶部边距，例如 '0px', '-60px'

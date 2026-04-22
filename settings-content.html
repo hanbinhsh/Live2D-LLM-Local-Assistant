@@ -87,6 +87,17 @@
                 <input data-key="waifuEdgeSide" class="waifu-select config-item" type="text">
             </div>
         </div>
+        <div class="setting-section-title">提示框外观</div>
+        <div class="settings-grid settings-grid-2 settings-grid-compact">
+            <div class="setting-group">
+                <label class="setting-label">提示框背景颜色</label>
+                <input data-key="waifuTipsBackgroundColor" class="waifu-select config-item" type="text" placeholder="例如: rgba(170,170,170,0.5) 或 #f4c7b5">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">提示框字体颜色</label>
+                <input data-key="waifuTipsTextColor" class="waifu-select config-item" type="text" placeholder="例如: #ffffff 或 #2f261f">
+            </div>
+        </div>
         <div class="setting-section-title">工具栏样式</div>
         <div class="settings-grid settings-grid-3 settings-grid-compact">
             <div class="setting-group">
@@ -239,25 +250,37 @@
         <div class="settings-subtab-pane active" data-subtabs-group="llm" data-subtab-pane="api">
             <div class="setting-section-title">核心接口配置</div>
             <div class="settings-grid settings-grid-2 settings-grid-compact">
-                <div class="setting-group">
-                    <label class="setting-label">LLM API 地址</label>
-                    <input data-key="llmApiUrl" class="waifu-select config-item" type="text" placeholder="http://127.0.0.1:11434/v1/chat/completions">
+                <div class="setting-group merged-setting-group">
+                    <div class="merged-setting-title">LLM API</div>
+                    <div class="merged-setting-grid merged-setting-grid-1">
+                        <div class="merged-setting-field">
+                            <label class="merged-setting-label">LLM API 地址</label>
+                            <input data-key="llmApiUrl" class="waifu-select config-item" type="text" placeholder="http://127.0.0.1:11434/v1/chat/completions">
+                        </div>
+                        <div class="merged-setting-field">
+                            <label class="merged-setting-label">API Key</label>
+                            <input data-key="llmApiKey" class="waifu-select config-item" type="password" placeholder="可留空">
+                        </div>
+                    </div>
                 </div>
-                <div class="setting-group">
-                    <label class="setting-label">API Key (Ollama可留空)</label>
-                    <input data-key="llmApiKey" class="waifu-select config-item" type="password">
+                <div class="setting-group merged-setting-group">
+                    <div class="merged-setting-title">TTS API</div>
+                    <div class="merged-setting-grid merged-setting-grid-1">
+                        <div class="merged-setting-field">
+                            <label class="merged-setting-label">TTS API 地址</label>
+                            <input data-key="ttsApiUrl" class="waifu-select config-item" type="text" placeholder="http://127.0.0.1:9880">
+                        </div>
+                        <div class="merged-setting-field">
+                            <label class="merged-setting-label">TTS API Key</label>
+                            <input data-key="ttsApiKey" class="waifu-select config-item" type="password" placeholder="可留空">
+                        </div>
+                    </div>
                 </div>
+            </div>
+            <div class="settings-grid settings-grid-compact">
                 <div class="setting-group">
                     <label class="setting-label">Python 后端地址 (Peek)</label>
                     <input data-key="pythonServerUrl" class="waifu-select config-item" type="text" placeholder="http://127.0.0.1:11542/">
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">TTS API 服务地址</label>
-                    <input data-key="ttsApiUrl" class="waifu-select config-item" type="text" placeholder="http://127.0.0.1:9880">
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">TTS API Key</label>
-                    <input data-key="ttsApiKey" class="waifu-select config-item" type="password" placeholder="可留空">
                 </div>
             </div>
 
@@ -293,57 +316,69 @@
             </div>
         </div>
 
-        <div class="settings-subtab-pane" data-subtabs-group="llm" data-subtab-pane="llm">
+        <div class="settings-subtab-pane llm-chat-pane" data-subtabs-group="llm" data-subtab-pane="llm">
             <div class="setting-section-title">对话记忆</div>
-            <div class="setting-group checkbox-group">
-                <label><input id="use-memory" data-key="useMemory" class="llm-item config-item" type="checkbox"> 多轮对话记忆</label>
-                <span style="font-size:12px;color:#999;">看板娘会记得你说过的话 (刷新网页依然有效)</span>
-            </div>
-            <div class="setting-group">
-                <label class="setting-label">记忆轮数限制 (1轮=一问一答)</label>
-                <div style="display:flex; gap:10px;">
-                    <input id="memory-limit" data-key="memoryLimit" class="waifu-select llm-item config-item" type="number" placeholder="10" style="width:80px; flex:none;">
-                    <button id="btn-clear-memory" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">清除记忆</button>
-                    <button id="btn-export-history" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">导出记录</button>
-                    <button id="btn-import-history" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">导入记录</button>
-                    <input type="file" id="file-import-input" accept=".json" style="display:none;">
+            <div class="settings-grid llm-chat-top-grid">
+                <div class="setting-group stacked-setting-group split-control-card">
+                    <label class="setting-label">对话记忆与轮数限制</label>
+                    <div class="split-control-row">
+                        <div class="split-control-info">
+                            <label class="inline-checkbox-row"><input id="use-memory" data-key="useMemory" class="llm-item config-item" type="checkbox"> 多轮对话记忆</label>
+                            <div class="setting-help-text">看板娘会记得你说过的话 (刷新网页依然有效)</div>
+                        </div>
+                        <div class="inline-action-row">
+                            <input id="memory-limit" data-key="memoryLimit" class="waifu-select llm-item config-item inline-action-input" type="number" placeholder="10">
+                            <button id="btn-clear-memory" class="waifu-btn secondary inline-action-btn">清除记忆</button>
+                            <button id="btn-export-history" class="waifu-btn secondary inline-action-btn">导出记录</button>
+                            <button id="btn-import-history" class="waifu-btn secondary inline-action-btn">导入记录</button>
+                            <input type="file" id="file-import-input" accept=".json" style="display:none;">
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="setting-section-title" style="margin-top:15px;">自动与定时</div>
-            <div class="setting-group checkbox-group">
-                <label><input data-key="autoRoast" class="config-item" type="checkbox"> 开启自动定时吐槽</label>
-            </div>
-            <div class="setting-group">
-                <label class="setting-label">自动间隔 (毫秒, 60000=1分钟)</label>
-                <input data-key="roastInterval" class="waifu-select config-item" type="number">
-            </div>
-            <hr style="border:0; border-top:1px dashed #ddd; margin:15px 0;">
-            <div class="setting-section-title">
-                提示词
-                <div style="float:right;"><button id="btn-reset-waifu" class="waifu-btn secondary">重置</button></div>
-            </div>
-            <div class="setting-group mtn-group" id="group-prompt-waifu" style="margin-top:10px;">
-                <label class="setting-label">看板娘人设 (对话模式)</label>
+            <div class="setting-group mtn-group llm-waifu-prompt-card" id="group-prompt-waifu" style="margin-top:10px;">
+                <label class="setting-label">
+                    <span class="setting-title-text">看板娘人设 (对话模式)</span>
+                    <button id="btn-reset-waifu" class="waifu-btn secondary">重置</button>
+                </label>
                 <textarea id="prompt-waifu" data-key="waifuPrompt" class="waifu-textarea config-item"></textarea>
             </div>
         </div>
 
-        <div class="settings-subtab-pane" data-subtabs-group="llm" data-subtab-pane="peek">
+        <div class="settings-subtab-pane peek-pane" data-subtabs-group="llm" data-subtab-pane="peek">
             <div class="setting-section-title">Peek 详细参数</div>
-            <div class="settings-grid settings-grid-2 settings-grid-compact">
-                <div class="setting-group">
-                    <label class="setting-label">功能模式</label>
-                    <select id="peek-mode" data-key="peekMode" class="waifu-select config-item">
-                        <option value="roast">屏幕吐槽 (Roast)</option>
-                        <option value="chat">聊天助手 (Chat Helper)</option>
-                    </select>
+            <div class="settings-grid settings-grid-2 peek-top-grid">
+                <div class="setting-group merged-setting-group">
+                    <div class="merged-setting-title">功能模式与截图范围</div>
+                    <div class="merged-setting-grid">
+                        <div class="merged-setting-field">
+                            <label class="merged-setting-label">功能模式</label>
+                            <select id="peek-mode" data-key="peekMode" class="waifu-select config-item">
+                                <option value="roast">屏幕吐槽 (Roast)</option>
+                                <option value="chat">聊天助手 (Chat Helper)</option>
+                            </select>
+                        </div>
+                        <div class="merged-setting-field">
+                            <label class="merged-setting-label">截图范围</label>
+                            <select id="peek-target-type" data-key="targetType" class="waifu-select config-item">
+                                <option value="fullscreen">全屏截图</option>
+                                <option value="window">指定窗口</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div class="setting-group">
-                    <label class="setting-label">截图范围</label>
-                    <select id="peek-target-type" data-key="targetType" class="waifu-select config-item">
-                        <option value="fullscreen">全屏截图</option>
-                        <option value="window">指定窗口</option>
-                    </select>
+                <div class="setting-group stacked-setting-group split-control-card">
+                    <label class="setting-label">自动吐槽与间隔</label>
+                    <div class="split-control-row">
+                        <div class="split-control-info">
+                            <label class="inline-checkbox-row"><input data-key="autoRoast" class="config-item" type="checkbox"> 开启自动定时吐槽</label>
+                            <div class="setting-help-text">开启后会按设定间隔自动截图并触发吐槽。</div>
+                            <div class="setting-help-text">间隔单位为毫秒，例如 `60000` = 1 分钟。</div>
+                        </div>
+                        <div class="inline-action-row">
+                            <input data-key="roastInterval" class="waifu-select config-item inline-action-input" type="number" placeholder="60000">
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="setting-group" id="group-window-select" style="display:none;">
@@ -355,27 +390,29 @@
                     <option value="0">请点击刷新...</option>
                 </select>
             </div>
-            <div class="setting-group prompt-group" id="group-prompt-roast" style="margin-top:10px;">
-                <label class="setting-label">
-                    吐槽提示词 
-                    <span style="font-size:10px; color:#888; font-weight:normal;">
-                        支持占位符: <code style="background:#eee;">/window_title</code> (当前活动窗口标题), 
-                        <code style="background:#eee;">/window_list</code> (当前窗口列表)
-                    </span>
-                    <button id="btn-reset-roast" class="waifu-btn secondary" style="float:right">重置</button>
-                </label>
-                <textarea id="prompt-roast" data-key="roastPrompt" class="waifu-textarea config-item"></textarea>
-            </div>
-            <div class="setting-group prompt-group" id="group-prompt-chat" style="display:none;margin-top:10px;">
-                <label class="setting-label">
-                    助手提示词
-                    <span style="font-size:10px; color:#888; font-weight:normal;">
-                        支持占位符: <code style="background:#eee;">/window_title</code> (当前活动窗口标题), 
-                        <code style="background:#eee;">/window_list</code> (当前窗口列表)
-                    </span>
-                    <button id="btn-reset-chat" class="waifu-btn secondary" style="float:right">重置</button>
-                </label>
-                <textarea id="prompt-chat" data-key="chatPrompt" class="waifu-textarea config-item"></textarea>
+            <div class="settings-grid settings-grid-2 peek-prompt-grid">
+                <div class="setting-group prompt-group" id="group-prompt-roast">
+                    <label class="setting-label">
+                        <span class="setting-title-text">吐槽提示词</span>
+                        <span class="setting-label-meta" style="font-size:10px; color:#888; font-weight:normal;">
+                            支持占位符: <code style="background:#eee;">/window_title</code> (当前活动窗口标题), 
+                            <code style="background:#eee;">/window_list</code> (当前窗口列表)
+                        </span>
+                        <button id="btn-reset-roast" class="waifu-btn secondary">重置</button>
+                    </label>
+                    <textarea id="prompt-roast" data-key="roastPrompt" class="waifu-textarea config-item"></textarea>
+                </div>
+                <div class="setting-group prompt-group" id="group-prompt-chat">
+                    <label class="setting-label">
+                        <span class="setting-title-text">助手提示词</span>
+                        <span class="setting-label-meta" style="font-size:10px; color:#888; font-weight:normal;">
+                            支持占位符: <code style="background:#eee;">/window_title</code> (当前活动窗口标题), 
+                            <code style="background:#eee;">/window_list</code> (当前窗口列表)
+                        </span>
+                        <button id="btn-reset-chat" class="waifu-btn secondary">重置</button>
+                    </label>
+                    <textarea id="prompt-chat" data-key="chatPrompt" class="waifu-textarea config-item"></textarea>
+                </div>
             </div>
         </div>
 
@@ -421,7 +458,7 @@
                 <div class="settings-grid settings-grid-2 settings-grid-compact">
                     <div class="setting-group merged-setting-group">
                         <div class="merged-setting-title">模型权重路径</div>
-                        <div class="merged-setting-grid">
+                        <div class="merged-setting-grid merged-setting-grid-1">
                             <div class="merged-setting-field">
                                 <label class="merged-setting-label">GPT 模型权重路径</label>
                                 <input data-key="ttsGptModelPath" class="waifu-select config-item" type="text" placeholder="例如: D:\GPT-SoVITS\gpt.ckpt">
@@ -434,11 +471,13 @@
                     </div>
                     <div class="setting-group merged-setting-group">
                         <div class="merged-setting-title">参考音频</div>
-                        <div class="merged-setting-grid merged-setting-grid-3">
+                        <div class="merged-setting-grid merged-setting-grid-1">
                             <div class="merged-setting-field">
                                 <label class="merged-setting-label">参考音频路径</label>
                                 <input data-key="ttsRefAudioPath" class="waifu-select config-item" type="text" placeholder="例如: G:\voice\ref.ogg">
                             </div>
+                        </div>
+                        <div class="merged-setting-grid merged-setting-grid-ref-audio">
                             <div class="merged-setting-field">
                                 <label class="merged-setting-label">参考音频对应的文本</label>
                                 <input data-key="ttsRefPromptText" class="waifu-select config-item" type="text" placeholder="例如: では、行きましょうか">
@@ -564,7 +603,7 @@
             <button class="settings-subtab-item" type="button" data-subtab="data">原始数据</button>
         </div>
 
-        <div class="settings-subtab-pane active" data-subtabs-group="report" data-subtab-pane="config">
+        <div class="settings-subtab-pane active report-config-pane" data-subtabs-group="report" data-subtab-pane="config">
             <div class="setting-section-title">报告生成与配置
                 <div style="float:right;"><button id="btn-gen-report" class="waifu-btn secondary">生成报告</button></div>
             </div>
@@ -576,7 +615,7 @@
             </div>
             <div class="settings-grid settings-grid-2 settings-grid-compact">
                 <div class="setting-group">
-                    <label class="setting-label">报告分类</label>
+                    <label class="setting-label">生成报告类型</label>
                     <select id="report-category" data-key="reportCategory" class="waifu-select config-item">
                         <option value="activity">电脑活动报告</option>
                         <option value="steam">Steam 游戏报告</option>
@@ -608,64 +647,85 @@
                     <input id="steam-key" class="waifu-select config-item" data-key="steamApiKey" type="password" placeholder="在此粘贴 Key">
                 </div>
             </div>
-            <div class="setting-group mtn-group">
-                <label class="setting-label">
-                    自定义提示词
-                    <select id="prompt-type-select" class="waifu-select" style="width:120px; height:24px; padding:0 5px; font-size:11px;">
-                        <option value="general">日报/周报模板</option>
-                        <option value="steam">Steam 报告模板</option>
-                    </select>
-                    <button id="btn-reset-current-prompt" class="waifu-btn secondary">重置</button>
-                </label>
-                <span style="font-size:10px; color:#888; font-weight:normal;">
-                    支持占位符: <code style="background:#eee;">/data:50</code> (插入50条活动数据), 
-                    <code style="background:#eee;">/chat_context:20</code> (插入20条对话),
-                    <code style="background:#eee;">/steam_profile</code> (steam个人资料),
-                    <code style="background:#eee;">/steam_recent_games</code> (steam近期游戏数据),
-                    <code style="background:#eee;">/steam_games:50</code> (插入50条steam库存),
-                </span>
-                <textarea id="report-prompt" class="waifu-textarea config-item"></textarea>
-            </div>
-        </div>
-
-        <div class="settings-subtab-pane" data-subtabs-group="report" data-subtab-pane="history">
-            <div class="setting-section-title">
-                历史报告 
-                <div style="float:right;"><button id="btn-refresh-reports" class="waifu-btn secondary">刷新</button></div>
-            </div>
-            <ul id="report-file-list" style="list-style:none; padding:0; max-height:320px; overflow-y:auto; border:1px solid #eee;">
-                <!-- JS 填充 -->
-            </ul>
-        </div>
-
-        <div class="settings-subtab-pane" data-subtabs-group="report" data-subtab-pane="data">
-            <div class="setting-section-title">
-                原始数据管理
-                <div style="float:right;">
-                    <button id="btn-refresh-data" class="waifu-btn secondary">刷新表</button>
-                    <button id="btn-clear-data" class="waifu-btn secondary">清空数据</button>
+            <div class="settings-grid settings-grid-2 report-template-grid">
+                <div class="setting-group mtn-group">
+                    <label class="setting-label">
+                        <span class="setting-title-text">日志 / 周报模板</span>
+                        <span class="setting-label-meta" style="font-size:10px; color:#888; font-weight:normal;">
+                            支持占位符: <code style="background:#eee;">/data:50</code> (插入50条活动数据), 
+                            <code style="background:#eee;">/chat_context:20</code> (插入20条对话),
+                        </span>
+                        <button id="btn-reset-report-prompt" class="waifu-btn secondary">重置</button>
+                    </label>
+                    <textarea id="report-prompt-general" data-key="reportPrompt" class="waifu-textarea config-item report-template-textarea"></textarea>
+                </div>
+                <div class="setting-group mtn-group">
+                    <label class="setting-label">
+                        <span class="setting-title-text">Steam 报告模板</span>
+                        <span class="setting-label-meta" style="font-size:10px; color:#888; font-weight:normal;">
+                            <code style="background:#eee;">/steam_profile</code> (steam个人资料),
+                            <code style="background:#eee;">/steam_recent_games</code> (steam近期游戏数据),
+                            <code style="background:#eee;">/steam_games:50</code> (插入50条steam库存),
+                        </span>
+                        <button id="btn-reset-steam-prompt" class="waifu-btn secondary">重置</button>
+                    </label>
+                    <textarea id="report-prompt-steam" data-key="steamPrompt" class="waifu-textarea config-item report-template-textarea"></textarea>
                 </div>
             </div>
-            <div class="setting-group">
-                <input id="data-search" class="waifu-select" placeholder="搜索应用名或标题..." style="width:100%;">
+        </div>
+
+        <div class="settings-subtab-pane report-history-pane" data-subtabs-group="report" data-subtab-pane="history">
+            <div class="report-toolbar-card">
+                <div class="report-toolbar-title">历史报告</div>
+                <div class="report-toolbar-actions">
+                    <button id="btn-refresh-reports" class="waifu-btn secondary">刷新</button>
+                </div>
             </div>
-            <div style="overflow-x:auto; border:1px solid #eee; margin-top:5px;">
-                <table id="activity-table" style="width:100%; font-size:12px; text-align:left; border-collapse:collapse;">
-                    <thead style="background:#f5f7fa; color:#606266;">
+            <div class="report-panel">
+                <div class="report-table-scroll">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>报告文件</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="report-file-list">
+                            <!-- JS 填充 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-subtab-pane report-data-pane" data-subtabs-group="report" data-subtab-pane="data">
+            <div class="report-toolbar-card">
+                <div class="report-toolbar-title">原始数据管理</div>
+                <div class="report-toolbar-actions report-toolbar-actions-wide">
+                    <input id="data-search" class="waifu-select report-toolbar-search" placeholder="搜索应用名或标题...">
+                    <button id="btn-refresh-data" class="waifu-btn secondary">刷新</button>
+                    <button id="btn-clear-data" class="waifu-btn secondary">清空</button>
+                </div>
+            </div>
+            <div class="report-panel">
+                <div class="report-table-scroll">
+                <table id="activity-table" class="report-table">
+                    <thead>
                         <tr>
-                            <th style="padding:5px;">时间</th>
-                            <th style="padding:5px;">应用</th>
-                            <th style="padding:5px;">标题</th>
-                            <th style="padding:5px;">时长(s)</th>
+                            <th>时间</th>
+                            <th>应用</th>
+                            <th>标题</th>
+                            <th>时长(s)</th>
                         </tr>
                     </thead>
-                    <tbody style="color:#333;"></tbody>
+                    <tbody></tbody>
                 </table>
-            </div>
-            <div style="text-align:center; margin-top:5px;">
-                <button id="btn-prev-page" class="waifu-btn secondary" style="padding:2px 8px;">&lt;</button>
-                <span id="page-info" style="font-size:12px; margin:0 10px; color:#666;">1 / 1</span>
-                <button id="btn-next-page" class="waifu-btn secondary" style="padding:2px 8px;">&gt;</button>
+                </div>
+                <div class="report-table-footer">
+                    <button id="btn-prev-page" class="waifu-btn secondary" style="padding:2px 8px;">&lt;</button>
+                    <span id="page-info" style="font-size:12px; margin:0 10px; color:#666;">1 / 1</span>
+                    <button id="btn-next-page" class="waifu-btn secondary" style="padding:2px 8px;">&gt;</button>
+                </div>
             </div>
         </div>
     </div>
@@ -689,12 +749,11 @@
                 </div>
             </div>
         </div>
-        <hr style="border:0; border-top:1px dashed #ddd; margin:15px 0;">
         <div class="setting-section-title">高级动作调试</div>
         <div class="setting-group mtn-group">
             <label class="setting-label">
                 输入 .mtn 文件内容
-                <button id="btn-play-raw" class="waifu-btn secondary" style="float:right;padding:1px 5px;font-size:10px;">执行动作</button>
+                <button id="btn-play-raw" class="waifu-btn secondary">执行</button>
             </label>
             <textarea id="debug-raw-mtn" class="waifu-textarea config-item" placeholder="# Live2D Animator Motion Data..."></textarea>
         </div>
@@ -962,44 +1021,17 @@
                 console.log("等待 live2d_settings 加载...");
                 setTimeout(initReportUI, 200); return;
             }
-            updatePromptTextarea($('#report-category'));
+            $('#report-prompt-general').val(live2d_settings.reportPrompt || default_settings.reportPrompt || '');
+            $('#report-prompt-steam').val(live2d_settings.steamPrompt || default_settings.steamPrompt || '');
         }
 
-        function updatePromptTextarea(btn) {
-            let type = $('#report-category').val();
-            if(btn!=="undefined"){
-                type = $(btn).val();
-            }
-            let content = "";
-            
-            if (type === 'steam') {
-                content = live2d_settings.steamPrompt;
-            } else {
-                content = live2d_settings.reportPrompt;
-            }
-            
-            // 如果为空，加载默认值
-            if (!content && typeof window.WAIFU_GLOBAL_DEFAULTS !== 'undefined') {
-                content = type === 'steam' ? window.WAIFU_GLOBAL_DEFAULTS.steamPrompt : window.WAIFU_GLOBAL_DEFAULTS.reportPrompt;
-            }
-            
-            $('#report-prompt').val(content);
-        }
-
-        $('#prompt-type-select').change(function() {
-            updatePromptTextarea(this);
+        $('#report-prompt-general').on('input propertychange', function() {
+            live2d_settings.reportPrompt = $(this).val();
+            saveGlobalSettings();
         });
 
-        $('#report-prompt').on('input propertychange', function() {
-            let val = $(this).val();
-            let type = $('#prompt-type-select').val();
-            
-            if (type === 'steam') {
-                live2d_settings.steamPrompt = val;
-            } else {
-                live2d_settings.reportPrompt = val;
-            }
-            // 保存到 LocalStorage
+        $('#report-prompt-steam').on('input propertychange', function() {
+            live2d_settings.steamPrompt = $(this).val();
             saveGlobalSettings();
         });
 
@@ -1020,15 +1052,10 @@
         });
 
         $('#report-category').change(function() {
-            let val = $(this).val();
-            if (val === 'steam') {
-                $('#prompt-type-select').val('steam').trigger('change');
-            } else {
-                $('#prompt-type-select').val('general').trigger('change');
-            }
-            live2d_settings.reportCategory = val; 
+            let val = $(this).val(); 
+            live2d_settings.reportCategory = val;
             saveGlobalSettings();
-        })
+        });
 
         // 4. 数据表格加载
         function loadActivityData(page) {
@@ -1079,20 +1106,24 @@
             fetch(getServerUrl() + 'report/list')
             .then(r=>r.json())
             .then(res => {
-                let ul = $('#report-file-list');
-                ul.empty();
+                let tbody = $('#report-file-list');
+                tbody.empty();
                 if (res.files && res.files.length > 0) {
                     res.files.forEach(f => {
                         let url = getServerUrl() + "storage/user_report/html/" + f;
-                        ul.append(`
-                            <li style="padding:5px; border-bottom:1px dashed #eee; display:flex; justify-content:space-between;">
-                                <a href="#" onclick="window.location.href='${url}';return false;" style="text-decoration:none; color:#333;">📄 ${f}</a>
-                                <span style="font-size:10px; color:#999; cursor:pointer;" onclick="window.location.href='${url}'">查看</span>
-                            </li>
+                        tbody.append(`
+                            <tr>
+                                <td>
+                                    <a href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; color:#333;">${f}</a>
+                                </td>
+                                <td>
+                                    <a href="${url}" target="_blank" rel="noopener noreferrer" style="font-size:12px; color:#666; text-decoration:none;">查看</a>
+                                </td>
+                            </tr>
                         `);
                     });
                 } else {
-                    ul.html('<li style="padding:10px; text-align:center; color:#999; font-size:12px;">暂无历史报告</li>');
+                    tbody.html('<tr><td colspan="2" class="report-table-empty">暂无历史报告</td></tr>');
                 }
             });
         }
@@ -1131,17 +1162,9 @@
             try { history = JSON.parse(historyStr); } catch(e) {}
 
             let category = $('#report-category').val(); // activity 或 steam
-            let promptUsed = "";
-
-            if (category === 'steam') {
-                promptUsed = (typeof live2d_settings !== 'undefined' ? live2d_settings.steamPrompt : "") || $('#report-prompt').val();
-            } else {
-                promptUsed = (typeof live2d_settings !== 'undefined' ? live2d_settings.reportPrompt : "") || $('#report-prompt').val();
-            }
-
-            if ($('#prompt-type-select').val() === category) {
-                promptUsed = $('#report-prompt').val();
-            }
+            let promptUsed = category === 'steam'
+                ? ((typeof live2d_settings !== 'undefined' ? live2d_settings.steamPrompt : "") || $('#report-prompt-steam').val())
+                : ((typeof live2d_settings !== 'undefined' ? live2d_settings.reportPrompt : "") || $('#report-prompt-general').val());
 
             let payload = {
                 model: model,
@@ -1188,7 +1211,6 @@
             loadReportList();
             loadActivityData(1);
             if($('#report-type').val() == "sql") $('#sql-container').show();
-            $('#report-category').change();
         });
     }
     // ==========================================
@@ -1196,19 +1218,17 @@
     // ==========================================
 
     // 提示词重置功能
-    $('#btn-reset-current-prompt').click(function() {
-        let type = $('#prompt-type-select').val();
-        let typeName = type === 'steam' ? "Steam" : "日报/周报";
-        
-        if(confirm(`确定要重置【${typeName}】提示词模板吗？`)) {
-            let defaultVal = type === 'steam' ? default_settings.steamPrompt : default_settings.reportPrompt;
-            if(type === 'steam') {
-                live2d_settings.steamPrompt = default_settings.steamPrompt;
-                $('#report-prompt').val(default_settings.steamPrompt);
-            } else {
-                live2d_settings.reportPrompt = default_settings.reportPrompt;
-                $('#report-prompt').val(default_settings.reportPrompt);
-            }
+    $('#btn-reset-report-prompt').click(function() {
+        if(confirm('确定要重置【日志 / 周报模板】吗？')) {
+            live2d_settings.reportPrompt = default_settings.reportPrompt;
+            $('#report-prompt-general').val(default_settings.reportPrompt);
+            saveGlobalSettings();
+        }
+    });
+    $('#btn-reset-steam-prompt').click(function() {
+        if(confirm('确定要重置【Steam 报告模板】吗？')) {
+            live2d_settings.steamPrompt = default_settings.steamPrompt;
+            $('#report-prompt-steam').val(default_settings.steamPrompt);
             saveGlobalSettings();
         }
     });

@@ -1,6 +1,7 @@
 import base64
 import io
 import re
+import socket
 import sys
 import win32gui
 import win32con
@@ -60,6 +61,7 @@ STORAGE_ROOT = os.path.join(PROJECT_ROOT, "storage")
 CUSTOM_MODEL_DEFAULT_FOLDER = r"F:\files\重音テト\VTS Model File\重音テト"
 CUSTOM_MODEL_ROUTE_PREFIX = "http://127.0.0.1:11542/live2d/custom_model"
 CUSTOM_MODEL_REGISTRY = {}
+WIDGET_CMD_PORT = 10453
 
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
@@ -77,6 +79,14 @@ class AnalyzeRequest(BaseModel):
     prompt: str = ""                # 自定义提示词
     mode: str = "roast"             # 'roast' (吐槽) 或 'chat' (聊天助手)
     model: str = ""                 # 前端指定使用的模型名称
+
+
+def send_widget_command(message: str):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.sendto(message.encode("utf-8"), ("127.0.0.1", WIDGET_CMD_PORT))
+    finally:
+        sock.close()
 
 
 class TTSSpeakRequest(BaseModel):
@@ -509,6 +519,15 @@ def list_models():
     except Exception as e:
         print(f"获取模型列表失败: {e}")
         return {"models": []}
+
+
+@app.post("/widget/open_settings")
+def open_widget_settings():
+    try:
+        send_widget_command("open_web_settings")
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"打开桌面设置窗口失败: {e}")
 
 
 @app.post("/live2d/custom_model/register")

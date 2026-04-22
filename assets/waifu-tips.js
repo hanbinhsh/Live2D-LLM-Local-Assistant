@@ -1201,6 +1201,12 @@ function initModel(waifuPath, type) {
                 else $(".waifu").draggable('enable');
             }
         }
+        if (key === 'waifuTipsBackgroundColor') {
+            $('.waifu-tips').css('background-color', val || window.WAIFU_GLOBAL_DEFAULTS.waifuTipsBackgroundColor);
+        }
+        if (key === 'waifuTipsTextColor') {
+            $('.waifu-tips').css('color', val || window.WAIFU_GLOBAL_DEFAULTS.waifuTipsTextColor);
+        }
     }
 
     function buildSettingsCenterUrl(options) {
@@ -1208,19 +1214,63 @@ function initModel(waifuPath, type) {
         var params = new URLSearchParams();
         if (options.tab) params.set('tab', options.tab);
         if (options.action) params.set('action', options.action);
+        if (options.reportCategory) params.set('reportCategory', options.reportCategory);
         var query = params.toString();
         return 'settings.html' + (query ? '?' + query : '');
     }
 
+    function isDesktopWidgetContext() {
+        var ua = navigator.userAgent || '';
+        return /QtWebEngine/i.test(ua) || /QtWebKit/i.test(ua);
+    }
+
+    async function openWidgetSettingsWindow() {
+        var baseUrl = (live2d_settings.pythonServerUrl || '').trim();
+        if (!baseUrl) {
+            showMessage('未配置 Python 后端地址，无法打开桌面设置窗口', 3000, true);
+            return false;
+        }
+        try {
+            var response = await fetch(baseUrl.replace(/\/?$/, '/') + 'widget/open_settings', {
+                method: 'POST'
+            });
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            return true;
+        } catch (err) {
+            console.error('[Settings] open widget settings failed:', err);
+            showMessage('桌面设置窗口打开失败，请确认后端和桌面挂件正在运行', 3500, true);
+            return false;
+        }
+    }
+
     function openSettingsCenter(options) {
         var url = buildSettingsCenterUrl(options);
-        var win = window.open(url, '_blank');
-        if (!win) window.location.href = url;
+        if (isDesktopWidgetContext()) {
+            openWidgetSettingsWindow();
+            return;
+        }
+        var win = window.open(url, '_blank', 'noopener,noreferrer');
+        if (win) {
+            try {
+                win.opener = null;
+                win.focus();
+            } catch (err) {}
+            return;
+        }
+        if (typeof showMessage === 'function') {
+            showMessage('请允许弹出新窗口后再打开设置页', 3000, true);
+        }
     }
 
     // 点击报告按钮
     $(document).on('click', '.waifu-tool .fui-calendar-solid', function() {
-        openSettingsCenter({ tab: 'report', action: 'generate' });
+        openSettingsCenter({
+            tab: 'report',
+            action: 'generate',
+            reportCategory: live2d_settings.reportCategory || 'activity'
+        });
     });
 
     // --- 图片上传逻辑 ---
@@ -1449,6 +1499,8 @@ function initModel(waifuPath, type) {
     $(".waifu-tips").height(s_waifuTipsSize[1]);
     $(".waifu-tips").css("top",live2d_settings.waifuToolTop);
     $(".waifu-tips").css("font-size",live2d_settings.waifuFontSize);
+    $(".waifu-tips").css("background-color", live2d_settings.waifuTipsBackgroundColor || window.WAIFU_GLOBAL_DEFAULTS.waifuTipsBackgroundColor);
+    $(".waifu-tips").css("color", live2d_settings.waifuTipsTextColor || window.WAIFU_GLOBAL_DEFAULTS.waifuTipsTextColor);
     $(".waifu-tool").css("font-size",live2d_settings.waifuToolFont);
     $(".waifu-tool span").css("line-height",live2d_settings.waifuToolLine);
     
